@@ -25,6 +25,31 @@
    "key": "level-1-5",
    "file": "levels/level-1-5.json",
    "name": "Level 5"
+  },
+  {
+   "key": "level-1-6",
+   "file": "levels/level-1-6.json",
+   "name": "Level 6"
+  },
+  {
+   "key": "level-1-7",
+   "file": "levels/level-1-7.json",
+   "name": "Level 7"
+  },
+  {
+   "key": "level-1-8",
+   "file": "levels/level-1-8.json",
+   "name": "Level 8"
+  },
+  {
+   "key": "level-1-9",
+   "file": "levels/level-1-9.json",
+   "name": "Level 9"
+  },
+  {
+   "key": "level-1-10",
+   "file": "levels/level-1-10.json",
+   "name": "Level 10"
   }
  ]
 }

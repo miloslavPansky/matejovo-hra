@@ -7,6 +7,7 @@ import { PixelText } from '../ui/PixelText';
 
 /** Title and level select for the current world. Progress comes from localStorage. */
 export class MenuScene extends Phaser.Scene {
+  private static readonly PER_ROW = 5;
   private selected = 0;
   private tiles: { box: Phaser.GameObjects.Rectangle; locked: boolean }[] = [];
   private levels: LevelInfo[] = [];
@@ -37,9 +38,9 @@ export class MenuScene extends Phaser.Scene {
     this.add.image(GAME_WIDTH - 60, 208 - 23, 'gate');
 
     new PixelText(this, GAME_WIDTH / 2, 34, 'Matěj a Zlatá poušť', { size: 16, color: '#ffe9b0' }).setOrigin(0.5);
-    new PixelText(this, GAME_WIDTH / 2, 62, `Kraj 1 · ${String(this.registry.get('world') ?? 'Zlaté duny')}`, { size: 8 }).setOrigin(0.5);
-    this.add.sprite(GAME_WIDTH / 2 - 60, 182, 'coin', '0').play('coin-spin');
-    new PixelText(this, GAME_WIDTH / 2 - 50, 182, `Mince celkem: ${progress.totalCoins}`, { size: 8 }).setOrigin(0, 0.5);
+    new PixelText(this, GAME_WIDTH / 2, 56, `Kraj 1 · ${String(this.registry.get('world') ?? 'Zlaté duny')}`, { size: 8 }).setOrigin(0.5);
+    this.add.sprite(GAME_WIDTH / 2 - 76, 194, 'coin', '0').play('coin-spin');
+    new PixelText(this, GAME_WIDTH / 2 - 66, 194, `Mince celkem: ${progress.totalCoins}`, { size: 8 }).setOrigin(0, 0.5);
 
     // Bottom-left buttons: intro replay and sound on/off.
     const introBtn = new PixelText(this, 8, GAME_HEIGHT - 8, 'Intro (I)', { size: 8, color: '#3b2a10', shadow: null, background: '#e9dfc4', padding: 4 })
@@ -50,16 +51,22 @@ export class MenuScene extends Phaser.Scene {
     const off = onMutedChange((m) => sound.setTexture(m ? 'icon-sound-off' : 'icon-sound-on'));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
 
+    // Level tiles in rows of five.
     const n = this.levels.length;
-    const w = 64, gap = 12, x0 = GAME_WIDTH / 2 - ((n * w + (n - 1) * gap) / 2) + w / 2;
+    const w = 64, h = 40, gap = 12, perRow = MenuScene.PER_ROW;
+    const x0 = GAME_WIDTH / 2 - ((perRow * w + (perRow - 1) * gap) / 2) + w / 2;
     this.levels.forEach((l, i) => {
       const locked = i >= progress.unlocked;
-      const x = x0 + i * (w + gap), y = 120;
-      const box = this.add.rectangle(x, y, w, 58, locked ? 0x6f6f6f : 0xd3cbb5).setStrokeStyle(3, 0x3b2a10);
-      new PixelText(this, x, y - 10, String(i + 1), { size: 16, color: locked ? '#bdbdbd' : '#3b2a10', shadow: null }).setOrigin(0.5);
+      const x = x0 + (i % perRow) * (w + gap), y = 94 + Math.floor(i / perRow) * (h + 8);
+      const box = this.add.rectangle(x, y, w, h, locked ? 0x6f6f6f : 0xd3cbb5).setStrokeStyle(3, 0x3b2a10);
+      new PixelText(this, x, y - 7, String(i + 1), { size: 16, color: locked ? '#bdbdbd' : '#3b2a10', shadow: null }).setOrigin(0.5);
       const best = progress.best[l.key];
-      const label = locked ? 'zamčeno' : best !== undefined ? `mince ${best}` : 'nový';
-      new PixelText(this, x, y + 16, label, { size: 8, color: locked ? '#d0d0d0' : '#6d5c43', shadow: null }).setOrigin(0.5);
+      if (!locked && best !== undefined) {
+        this.add.image(x - 12, y + 12, 'coin', '0');
+        new PixelText(this, x - 5, y + 12, String(best), { size: 8, color: '#6d5c43', shadow: null }).setOrigin(0, 0.5);
+      } else {
+        new PixelText(this, x, y + 12, locked ? 'zamčeno' : 'nový', { size: 8, color: locked ? '#d0d0d0' : '#6d5c43', shadow: null }).setOrigin(0.5);
+      }
       if (!locked) {
         box.setInteractive({ useHandCursor: true });
         box.on('pointerdown', () => this.startLevel(i));
@@ -70,12 +77,14 @@ export class MenuScene extends Phaser.Scene {
     this.selected = Math.min(progress.unlocked, n) - 1;
     this.highlight();
 
-    new PixelText(this, GAME_WIDTH / 2, 162, 'Vyber level šipkami a Enterem, nebo na něj klepni.', { size: 8 }).setOrigin(0.5);
+    new PixelText(this, GAME_WIDTH / 2, 178, 'Šipky + Enter, nebo klepni', { size: 8 }).setOrigin(0.5);
     new PixelText(this, GAME_WIDTH - 4, GAME_HEIGHT - 4, `verze ${__APP_VERSION__}`, { size: 8, color: '#3b2a10', shadow: null }).setOrigin(1);
 
     const kb = this.input.keyboard;
     kb?.on('keydown-LEFT', () => this.move(-1));
     kb?.on('keydown-RIGHT', () => this.move(1));
+    kb?.on('keydown-UP', () => this.move(-MenuScene.PER_ROW));
+    kb?.on('keydown-DOWN', () => this.move(MenuScene.PER_ROW));
     kb?.on('keydown-ENTER', () => this.startLevel(this.selected));
     kb?.on('keydown-SPACE', () => this.startLevel(this.selected));
     kb?.on('keydown-I', () => this.playIntro());

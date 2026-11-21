@@ -1,19 +1,32 @@
 // Generates the levels of world 1 (Zlaté duny) in Tiled JSON format, plus public/levels/index.json.
-// Every level is 240 x 17 tiles split into four quarters. A level is a hand-written list of segments
-// per quarter; the builder lays them out, pads with flat ground, and places the start, a checkpoint
-// after each of the first three quarters and the finish (Sun Gate).
+// Every level is 480 x 17 tiles split into eight sections of about 60 tiles. Each section is one of
+// the hand-designed segment lists below (grouped into five difficulty tiers); a checkpoint follows each
+// of the first seven sections. Levels mix two neighbouring tiers, so the hardest level is as dense as
+// the hardest tier and never harder. Finally the levels are ordered by their number of hazards.
 // The JSON files can be edited in Tiled (https://www.mapeditor.org/) afterwards.
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const W = 240, H = 17, TILE = 16, BASE = 13, MIN_TOP = 9;
+const W = 480, H = 17, TILE = 16, BASE = 13, MIN_TOP = 9;
 const SAND = 1, STONE = 2, PLANK = 3, STONE2 = 4; // keep in sync with src/config.ts TILES
+const LEVEL_COUNT = 10;
+const SECTIONS = 8;
 const START_ZONE = 6;     // flat columns at the start
-const CHECK_ZONE = 8;     // flat columns around each checkpoint
+const CHECK_ZONE = 8;     // flat columns around each checkpoint (flag at the 4th column)
 const FINISH_ZONE = 8;    // flat columns at the end
-// Last column each quarter may use; checkpoints follow quarters 1-3 (around columns 59, 119, 179).
-const QUARTER_END = [55, 115, 175, W - FINISH_ZONE - 1];
+// Last column each section may use; checkpoints follow at columns 59, 119, …, 419.
+const SECTION_END = Array.from({ length: SECTIONS }, (_, i) => (i < SECTIONS - 1 ? 60 * (i + 1) - 5 : W - FINISH_ZONE - 1));
+
+function rng(seed) {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 /**
  * Segments:
@@ -27,7 +40,7 @@ const QUARTER_END = [55, 115, 175, W - FINISH_ZONE - 1];
  *  plat N      N flat columns with a plank platform 3 tiles above and coins on it
  *  hill        7 columns: up 1, up 2, down, with coins on the top
  */
-const LEVELS = [
+const TIERS = [
   { n: 1, q: [
     ['flat 4 c', 'scorp 9', 'gap 2', 'plant', 'flat 3 c', 'cactus', 'hill'],
     ['plat 8', 'scorp 9', 'gap 2', 'plant', 'flat 4 c', 'cactus', 'hill'],
@@ -60,6 +73,42 @@ const LEVELS = [
   ] },
 ];
 
+/** Columns a segment list needs, including the steps back down to the base height. */
+function widthOf(list) {
+  let w = 0, rise = 0;
+  for (const s of list) {
+    const [kind, arg] = s.split(' ');
+    const n = Number(arg);
+    if (kind === 'up') rise++;
+    else if (kind === 'down') rise = Math.max(0, rise - 1);
+    else if (kind === 'plant' || kind === 'cactus') w += 5;
+    else if (kind === 'gap' || kind === 'gapP') w += n + 2;
+    else if (kind === 'hill') w += 7;
+    else w += n;
+  }
+  return w + rise;
+}
+
+/** Picks eight sections for level n: tier ceil(n/2), mixed with the tier below it (more of it on odd levels). */
+function composeLevel(n) {
+  const R = rng(1000 + n * 7919);
+  const tier = Math.ceil(n / 2);
+  const lower = Math.max(1, tier - 1);
+  const fromLower = n % 2 ? 4 : 2;
+  const tiers = Array.from({ length: SECTIONS }, (_, i) => (i < fromLower ? lower : tier));
+  for (let i = tiers.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [tiers[i], tiers[j]] = [tiers[j], tiers[i]]; }
+  const sections = [];
+  let prev = null;
+  tiers.forEach((t, i) => {
+    const slot = SECTION_END[i] - (i === 0 ? START_ZONE : SECTION_END[i - 1] + 1 + CHECK_ZONE) + 1;
+    const pool = TIERS[t - 1].q.filter((q) => q !== prev && widthOf(q) <= slot);
+    const pick = pool[Math.floor(R() * pool.length)];
+    sections.push(pick);
+    prev = pick;
+  });
+  return { n, tier, sections };
+}
+
 function buildLevel(def) {
   const top = new Array(W).fill(null); // surface row per column, null = gap
   const planks = []; // [col, row]
@@ -81,8 +130,9 @@ function buildLevel(def) {
     const start = col;
     switch (kind) {
       case 'flat': flat(n); if (flag === 'c') for (let i = 1; i < n - 1; i++) coin(start + i, 1); break;
-      case 'up': if (h - 1 < MIN_TOP) throw new Error(`L${def.n}: too high`); h--; break;
-      case 'down': if (h + 1 > BASE) throw new Error(`L${def.n}: below base`); h++; break;
+      // Sections always start at the base height, so a "down" at the base is simply skipped.
+      case 'up': if (h - 1 >= MIN_TOP) h--; break;
+      case 'down': if (h + 1 <= BASE) h++; break;
       case 'scorp': {
         if (n < 7) throw new Error('scorp needs at least 7 columns');
         flat(n);
@@ -117,12 +167,13 @@ function buildLevel(def) {
 
   flat(START_ZONE);
   obj('start', 2, h);
-  def.q.forEach((quarter, qi) => {
-    for (const s of quarter) segment(s);
-    const end = QUARTER_END[qi];
-    if (col > end + 1) throw new Error(`L${def.n}: quarter ${qi + 1} too long (ends at ${col - 1}, limit ${end})`);
+  def.sections.forEach((section, si) => {
+    for (const s of section) segment(s);
+    while (h < BASE) { flat(1); h++; } // step back down to the base height
+    const end = SECTION_END[si];
+    if (col > end + 1) throw new Error(`L${def.n}: section ${si + 1} too long (ends at ${col - 1}, limit ${end})`);
     flat(end + 1 - col);
-    if (qi < 3) {
+    if (si < SECTIONS - 1) {
       const cp = col + 3;
       flat(CHECK_ZONE);
       obj('checkpoint', cp, h);
@@ -155,14 +206,25 @@ function buildLevel(def) {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dir = join(root, 'public', 'levels');
 mkdirSync(dir, { recursive: true });
-const index = [];
-for (const def of LEVELS) {
+for (const f of readdirSync(dir)) if (/^level-1-\d+\.json$/.test(f)) unlinkSync(join(dir, f));
+
+const HAZARDS = ['scorpion', 'plant', 'cactus'];
+const built = Array.from({ length: LEVEL_COUNT }, (_, i) => composeLevel(i + 1)).map((def) => {
   const map = buildLevel(def);
-  const key = `level-1-${def.n}`;
+  return { def, map, hazards: map.layers[1].objects.filter((o) => HAZARDS.includes(o.type)).length };
+});
+// Order by number of hazards so difficulty never drops from one level to the next.
+built.sort((a, b) => a.hazards - b.hazards || a.def.n - b.def.n);
+
+const index = [];
+built.forEach(({ map, def }, i) => {
+  const n = i + 1;
+  map.properties = [{ name: 'nazev', type: 'string', value: `Kraj 1 · Level ${n}` }];
+  const key = `level-1-${n}`;
   writeFileSync(join(dir, `${key}.json`), JSON.stringify(map, null, 1) + '\n');
-  index.push({ key, file: `levels/${key}.json`, name: `Level ${def.n}` });
+  index.push({ key, file: `levels/${key}.json`, name: `Level ${n}` });
   const objs = map.layers[1].objects;
   const count = (t) => objs.filter((o) => o.type === t).length;
-  console.log(`${key}: ${count('coin')} coins, ${count('scorpion')} scorpions, ${count('plant')} plants, ${count('cactus')} cacti`);
-}
+  console.log(`${key} (tier ${def.tier}): ${count('coin')} coins, ${count('scorpion')} scorpions, ${count('plant')} plants, ${count('cactus')} cacti, ${count('checkpoint')} checkpoints`);
+});
 writeFileSync(join(dir, 'index.json'), JSON.stringify({ world: 'Zlaté duny', levels: index }, null, 1) + '\n');

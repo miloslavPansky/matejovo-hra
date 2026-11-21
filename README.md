@@ -18,12 +18,12 @@ sbírá mince, přeskakuje štíry a masožravé rostliny a hledá cestu domů.
 Na štíra i masožravou rostlinu se dá skočit shora. Kaktus se musí přeskočit.
 
 Vpravo nahoře je počet mincí ve tvaru *mince v tomto levelu / mince celkem*, uprostřed nahoře
-číslo levelu (například *Level 2/5*).
+číslo levelu (například *Level 2/10*).
 
-## Stav prototypu (verze 0.3)
+## Stav prototypu (verze 0.4)
 
 Hotovo: animované intro podle příběhu (pískoviště, zlatý kámen, pád do pouště), celý první kraj
-Zlaté duny s 5 levely (každý 240 bloků se 3 checkpointy, obtížnost postupně roste), výběr levelu,
+Zlaté duny s 10 levely (každý 480 bloků se 7 checkpointy, obtížnost roste jen pozvolna), výběr levelu,
 běh a skok, mince, štíři, masožravé rostliny, kaktusy, propasti, plošiny, 3 srdce, Sluneční brána v cíli,
 8bitové zvuky a hudba s vypínačem, usměvavé slunce, dotykové ovládání a nasazení na GitHub Pages.
 
@@ -38,8 +38,10 @@ Zatím chybí: obchod, dialogy v levelech, další kraje a instalace jako aplika
 - [Phaser 3](https://phaser.io/), TypeScript a [Vite](https://vite.dev/)
 - Veškerá grafika se kreslí kódem při spuštění (`src/art`), ve stylu návrhu v0.2.
 - Levely jsou ve formátu [Tiled](https://www.mapeditor.org/) JSON (`public/levels`).
-  Levely kraje 1 skládá skript `scripts/gen-level.mjs` z ručně navržených úseků (štír, rostlina, kaktus,
-  propast, plošina, kopec) a testy v `tests/` hlídají, že jsou propasti přeskočitelné a obtížnost roste.
+  Levely kraje 1 skládá skript `scripts/gen-level.mjs` z 20 ručně navržených úseků po ~50 blocích
+  (štír, rostlina, kaktus, propast, plošina, kopec) v pěti stupních obtížnosti. Každý level má 8 úseků
+  ze dvou sousedních stupňů a za každým úsekem kromě posledního je checkpoint. Testy v `tests/` hlídají
+  přeskočitelné propasti, rozmístění checkpointů, strop obtížnosti a její plynulý růst.
 - Písmo Press Start 2P se kreslí jako ostré pixely (`src/ui/PixelText.ts`), jen ve velikostech 8 a 16 px.
 - Zvuky a hudba se syntetizují přes Web Audio API (`src/audio/sound.ts`), nic se nestahuje.
 - CI/CD: GitHub Actions (`.github/workflows/ci-cd.yml`) u každého pushe a pull requestu ověří

@@ -54,6 +54,7 @@ export class GameScene extends Phaser.Scene {
   private walletBefore = 0;
   private spawn = new Phaser.Math.Vector2();
   private checkpointsReached = 0;
+  private checkpointTotal = 0;
   private finished = false;
   private mapHeight = 0;
 
@@ -149,6 +150,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.coinTotal = this.coins.getLength();
+    this.checkpointTotal = checkpoints.getLength();
 
     this.player = new Player(this, this.spawn.x, this.spawn.y);
     this.controls = new Controls(this);
@@ -300,7 +302,7 @@ export class GameScene extends Phaser.Scene {
     if (flag.x > this.spawn.x) this.spawn.set(flag.x, flag.y - 4);
     sfx.checkpoint();
     this.sparkle(flag.x + 6, flag.y - 14, 0xf2c230);
-    this.game.events.emit(GAME_EVENTS.toast, `Checkpoint ${this.checkpointsReached}/3`);
+    this.game.events.emit(GAME_EVENTS.toast, `Checkpoint ${this.checkpointsReached}/${this.checkpointTotal}`);
   }
 
   private completeLevel(): void {

@@ -18,8 +18,8 @@ const surfaceRow = (map, terrain, c) => {
   return null;
 };
 
-test('world 1 has five levels', () => {
-  assert.equal(index.levels.length, 5);
+test('world 1 has ten levels', () => {
+  assert.equal(index.levels.length, 10);
 });
 
 const stats = [];
@@ -30,18 +30,18 @@ for (const level of index.levels) {
   stats.push({ key: level.key, hazards: objects.filter((o) => HAZARDS.includes(o.type)).length, gaps: 0 });
 
   test(`${level.key}: size and layers`, () => {
-    assert.equal(map.width, 240, 'every level is 240 tiles long');
+    assert.equal(map.width, 480, 'every level is 480 tiles long');
     assert.equal(map.tilewidth, 16);
     assert.ok(terrain, 'tile layer "teren" exists');
     assert.equal(terrain.data.length, map.width * map.height);
     for (const id of terrain.data) assert.ok(VALID_TILES.has(id), `unknown tile id ${id}`);
   });
 
-  test(`${level.key}: start, three evenly spaced checkpoints, finish`, () => {
+  test(`${level.key}: start, a checkpoint every ~60 tiles, finish`, () => {
     for (const type of ['start', 'finish']) assert.equal(objects.filter((o) => o.type === type).length, 1, `exactly one ${type}`);
     const cps = objects.filter((o) => o.type === 'checkpoint').map((o) => Math.floor(o.x / 16)).sort((a, b) => a - b);
-    assert.equal(cps.length, 3, 'three checkpoints');
-    [60, 120, 180].forEach((target, i) => assert.ok(Math.abs(cps[i] - target) <= 8, `checkpoint ${i + 1} near column ${target} (is ${cps[i]})`));
+    assert.equal(cps.length, 7, 'seven checkpoints');
+    cps.forEach((c, i) => assert.ok(Math.abs(c - 60 * (i + 1)) <= 8, `checkpoint ${i + 1} near column ${60 * (i + 1)} (is ${c})`));
   });
 
   test(`${level.key}: objects inside the map, scorpions have a range`, () => {
@@ -76,6 +76,10 @@ for (const level of index.levels) {
     }
   });
 }
+
+test('difficulty does not exceed the old hardest level (at most 22 hazards per 240 tiles)', () => {
+  for (const s of stats) assert.ok(s.hazards <= 44, `${s.key} has ${s.hazards} hazards`);
+});
 
 test('difficulty rises from level to level', () => {
   for (let i = 1; i < stats.length; i++) {
