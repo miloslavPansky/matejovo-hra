@@ -49,9 +49,10 @@ function skyCanvas(): HTMLCanvasElement {
   x.fillStyle = BIOME.sky[1];
   x.fillRect(0, HORIZON, GAME_WIDTH, GAME_HEIGHT - HORIZON);
   x.fillStyle = '#fff3a0';
-  x.fillRect(372, 22, 30, 30);
+  // sun: right of the menu title and below the HUD coin counter
+  x.fillRect(412, 40, 30, 30);
   x.fillStyle = '#fffbe0';
-  x.fillRect(379, 29, 16, 16);
+  x.fillRect(419, 47, 16, 16);
   return c;
 }
 
@@ -140,9 +141,10 @@ export function generateTextures(scene: Phaser.Scene): void {
   addCanvas(scene, 'scorp-b', refine(sprite(S.SCORP_B, S.SCORP_PAL)));
   addCanvas(scene, 'plant-open', refine(sprite(S.PLANT_OPEN, S.PLANT_PAL)));
   addCanvas(scene, 'plant-closed', refine(sprite(S.PLANT_CLOSED, S.PLANT_PAL)));
+  addCanvas(scene, 'cactus', refine(sprite(S.CACTUS, S.CACTUS_PAL)));
   addCanvas(scene, 'flag-off', refine(sprite(S.FLAG, S.FLAG_OFF_PAL)));
   addCanvas(scene, 'flag-on', refine(sprite(S.FLAG, S.FLAG_ON_PAL)));
-  addCanvas(scene, 'obelisk', refine(sprite(S.OBELISK, S.OBELISK_PAL)));
+  addCanvas(scene, 'gate', refine(sprite(S.GATE, S.GATE_PAL)));
   addCanvas(scene, 'heart', sprite(S.HEART, S.HEART_PAL));
   addCanvas(scene, 'heart-empty', sprite(S.HEART, S.HEART_EMPTY_PAL));
 
@@ -159,7 +161,9 @@ export function generateTextures(scene: Phaser.Scene): void {
   sx.fillRect(0, 0, 2, 2);
   addCanvas(scene, 'spark', spark);
 
-  addCanvas(scene, 'tiles', tilesetCanvas());
+  const tiles = addCanvas(scene, 'tiles', tilesetCanvas());
+  tiles.add('sand', 0, 0, 0, 16, 16);
+  tiles.add('stone', 0, 16, 0, 16, 16);
   addCanvas(scene, 'bg-sky', skyCanvas());
   addCanvas(scene, 'bg-clouds', cloudsCanvas());
   addCanvas(scene, 'bg-far', farCanvas());

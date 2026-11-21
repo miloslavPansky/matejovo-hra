@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { FONT, GAME_HEIGHT, GAME_WIDTH, LIVES } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, LIVES } from '../config';
 import { touch } from '../game/Controls';
-import { GAME_EVENTS, type HudState } from './GameScene';
+import { PixelText } from '../ui/PixelText';
+import { GAME_EVENTS, type CompleteResult, type HudState } from './GameScene';
 
 interface TouchButton {
   x: number;
@@ -11,32 +12,35 @@ interface TouchButton {
   gfx: Phaser.GameObjects.Graphics;
 }
 
-const TEXT = { fontFamily: FONT, color: '#ffffff' };
-
 /** HUD (hearts, coins), touch controls, pause menu, toasts and the level-complete screen. */
 export class UIScene extends Phaser.Scene {
   private hearts: Phaser.GameObjects.Image[] = [];
-  private coinText!: Phaser.GameObjects.Text;
-  private toastText!: Phaser.GameObjects.Text;
+  private coinText!: PixelText;
+  private toastText!: PixelText;
   private buttons: TouchButton[] = [];
   private touchUi!: Phaser.GameObjects.Container;
   private overlay: Phaser.GameObjects.Container | null = null;
   private touchEnabled = false;
+  private primaryAction: (() => void) | null = null;
 
   constructor() {
     super('ui');
   }
 
   create(): void {
-    this.input.addPointer(3);
+    // The scene instance is reused when it is launched again, so reset per-run state.
+    this.hearts = [];
+    this.buttons = [];
+    this.overlay = null;
+    this.primaryAction = null;
+    if (this.input.manager.pointersTotal < 4) this.input.addPointer(4 - this.input.manager.pointersTotal);
     for (let i = 0; i < LIVES; i++) this.hearts.push(this.add.image(8 + i * 13, 8, 'heart').setOrigin(0).setScale(1));
     this.add.sprite(GAME_WIDTH - 54, 8, 'coin', '0').setOrigin(0).play('coin-spin');
-    this.coinText = this.add.text(GAME_WIDTH - 40, 6, '0', { ...TEXT, fontSize: '12px' }).setShadow(1, 1, '#3b2a10', 0, false, true);
-    this.toastText = this.add.text(GAME_WIDTH / 2, 56, '', { ...TEXT, fontSize: '16px', color: '#ffe9b0' })
-      .setOrigin(0.5).setShadow(1, 1, '#3b2a10', 0, false, true).setAlpha(0);
+    this.coinText = new PixelText(this, GAME_WIDTH - 41, 9, '0', { size: 8 }).setOrigin(0);
+    this.toastText = new PixelText(this, GAME_WIDTH / 2, 56, ' ', { size: 16, color: '#ffe9b0' }).setOrigin(0.5).setAlpha(0);
 
-    const pause = this.add.text(GAME_WIDTH / 2, 4, 'II', { ...TEXT, fontSize: '12px', backgroundColor: '#00000055', padding: { x: 6, y: 2 } })
-      .setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
+    const pause = new PixelText(this, GAME_WIDTH / 2, 3, 'II', { size: 8, shadow: null, background: '#4a3a22', padding: 4 })
+      .setOrigin(0.5, 0).setAlpha(0.85).setInteractive({ useHandCursor: true });
     pause.on('pointerdown', () => this.togglePause());
 
     this.createTouchControls();
@@ -51,7 +55,7 @@ export class UIScene extends Phaser.Scene {
 
     this.input.keyboard?.on('keydown-ESC', () => this.togglePause());
     this.input.keyboard?.on('keydown-P', () => this.togglePause());
-    this.input.keyboard?.on('keydown-ENTER', () => { if (this.overlay) this.restartLevel(); });
+    this.input.keyboard?.on('keydown-ENTER', () => { if (this.overlay) this.primaryAction?.(); });
 
     const ev = this.game.events;
     ev.on(GAME_EVENTS.hud, this.onHud, this);
@@ -75,7 +79,7 @@ export class UIScene extends Phaser.Scene {
       const gfx = this.add.graphics();
       this.touchUi.add(gfx);
       this.buttons.push({ ...d, gfx });
-      if (d.key === 'jump') this.touchUi.add(this.add.text(d.x, d.y, 'SKOK', { ...TEXT, fontSize: '12px' }).setOrigin(0.5));
+      if (d.key === 'jump') this.touchUi.add(new PixelText(this, d.x, d.y, 'SKOK', { size: 8 }).setOrigin(0.5));
     }
     this.drawButtons();
   }
@@ -122,8 +126,7 @@ export class UIScene extends Phaser.Scene {
 
   private showToast(text: string): void {
     this.tweens.killTweensOf(this.toastText);
-    this.toastText.setText(text).setAlpha(1).setScale(0.8);
-    this.tweens.add({ targets: this.toastText, scale: 1, duration: 150 });
+    this.toastText.setText(text).setAlpha(1);
     this.tweens.add({ targets: this.toastText, alpha: 0, delay: 1500, duration: 400 });
   }
 
@@ -131,16 +134,17 @@ export class UIScene extends Phaser.Scene {
     this.closeOverlay();
     const c = this.add.container(0, 0).setDepth(100);
     c.add(this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x1b1206, 0.72).setOrigin(0).setInteractive());
-    c.add(this.add.text(GAME_WIDTH / 2, 62, title, { ...TEXT, fontSize: '24px', color: '#ffd36a' }).setOrigin(0.5).setShadow(2, 2, '#000000', 0, false, true));
-    lines.forEach((l, i) => c.add(this.add.text(GAME_WIDTH / 2, 98 + i * 16, l, { ...TEXT, fontSize: '12px' }).setOrigin(0.5)));
+    c.add(new PixelText(this, GAME_WIDTH / 2, 62, title, { size: 16, color: '#ffd36a', shadow: '#000000' }).setOrigin(0.5));
+    lines.forEach((l, i) => c.add(new PixelText(this, GAME_WIDTH / 2, 98 + i * 14, l, { size: 8 }).setOrigin(0.5)));
     buttons.forEach(([label, fn], i) => {
+      if (i === 0) this.primaryAction = fn;
       const y = 150 + i * 34;
       const bg = this.add.rectangle(GAME_WIDTH / 2, y, 150, 26, i === 0 ? 0x3c8527 : 0x6f6f6f).setStrokeStyle(2, 0x1b1b1b).setInteractive({ useHandCursor: true });
       bg.on('pointerdown', fn);
       c.add(bg);
-      c.add(this.add.text(GAME_WIDTH / 2, y, label, { ...TEXT, fontSize: '13px' }).setOrigin(0.5));
+      c.add(new PixelText(this, GAME_WIDTH / 2, y, label, { size: 8, shadow: '#1b1b1b' }).setOrigin(0.5));
     });
-    c.add(this.add.text(GAME_WIDTH - 4, GAME_HEIGHT - 4, `verze ${__APP_VERSION__}`, { ...TEXT, fontSize: '8px', color: '#bfae86' }).setOrigin(1));
+    c.add(new PixelText(this, GAME_WIDTH - 4, GAME_HEIGHT - 4, `verze ${__APP_VERSION__}`, { size: 8, color: '#bfae86', shadow: null }).setOrigin(1));
     this.overlay = c;
     touch.left = touch.right = touch.jump = false;
     this.drawButtons();
@@ -149,6 +153,7 @@ export class UIScene extends Phaser.Scene {
   private closeOverlay(): void {
     this.overlay?.destroy();
     this.overlay = null;
+    this.primaryAction = null;
   }
 
   private togglePause(): void {
@@ -161,21 +166,43 @@ export class UIScene extends Phaser.Scene {
       return;
     }
     this.scene.pause('game');
-    this.makeOverlay('Pauza', ['Šipky nebo A/D běh, mezerník nebo šipka nahoru skok.'], [
+    this.makeOverlay('Pauza', ['Šipky nebo A/D běh, mezerník nebo šipka nahoru skok.', 'Na štíra i rostlinu se dá skočit shora.'], [
       ['Pokračovat', () => this.togglePause()],
       ['Hrát znovu', () => this.restartLevel()],
+      ['Výběr levelu', () => this.toMenu()],
     ]);
   }
 
-  private onComplete(r: { coins: number; total: number }): void {
-    this.makeOverlay('Level dokončen!', [`Mince: ${r.coins} z ${r.total}`, r.coins === r.total ? 'Všechny mince! Bedřich bude mít radost.' : 'Někde ještě nějaké mince zůstaly.'], [
-      ['Hrát znovu', () => this.restartLevel()],
-    ]);
+  private onComplete(r: CompleteResult): void {
+    const lines = [`Mince: ${r.coins} z ${r.total}`, r.coins === r.total ? 'Všechny mince! Bedřich bude mít radost.' : 'Někde ještě nějaké mince zůstaly.'];
+    const next = r.next;
+    if (next) {
+      this.makeOverlay('Level dokončen!', lines, [
+        ['Další level', () => this.startLevel(next)],
+        ['Hrát znovu', () => this.restartLevel()],
+        ['Výběr levelu', () => this.toMenu()],
+      ]);
+    } else {
+      this.makeOverlay('Kraj 1 dokončen!', [...lines, 'Další kraj se teprve staví.'], [
+        ['Výběr levelu', () => this.toMenu()],
+        ['Hrát znovu', () => this.restartLevel()],
+      ]);
+    }
   }
 
   private restartLevel(): void {
     this.closeOverlay();
-    const game = this.scene.get('game');
-    game.scene.restart();
+    this.scene.get('game').scene.restart();
+  }
+
+  private startLevel(key: string): void {
+    this.closeOverlay();
+    this.scene.get('game').scene.restart({ level: key });
+  }
+
+  private toMenu(): void {
+    this.closeOverlay();
+    this.scene.stop('game');
+    this.scene.start('menu');
   }
 }

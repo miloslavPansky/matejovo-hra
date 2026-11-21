@@ -3,7 +3,8 @@ export const GAME_HEIGHT = 270;
 export const TILE = 16;
 export const GRAVITY = 900;
 export const LIVES = 3;
-export const FONT = '"Pixelify Sans", "Courier New", monospace';
+/** Pixel font designed on an 8px grid: use sizes 8 or 16 only, otherwise glyphs distort. */
+export const FONT = '"Press Start 2P", "Courier New", monospace';
 
 /** Tile ids in the Tiled tileset "poust" (gid with firstgid 1). Keep in sync with scripts/gen-level.mjs. */
 export const TILES = { sand: 1, stone: 2, plank: 3, stone2: 4 } as const;

@@ -1,6 +1,13 @@
 import Phaser from 'phaser';
 import { generateTextures } from '../art/textures';
-import { FONT, GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import type { LevelInfo } from '../game/progress';
+import { PixelText } from '../ui/PixelText';
+
+interface LevelIndex {
+  world: string;
+  levels: LevelInfo[];
+}
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -8,13 +15,18 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const label = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'Načítám poušť…', { fontFamily: FONT, fontSize: '14px', color: '#ffe9b0' }).setOrigin(0.5);
+    const label = new PixelText(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 'Načítám poušť…', { size: 16, color: '#ffe9b0', shadow: null }).setOrigin(0.5);
     this.load.on('loaderror', (file: Phaser.Loader.File) => label.setText(`Nepodařilo se načíst ${file.key}`));
-    this.load.tilemapTiledJSON('level-1-1', 'levels/level-1-1.json');
+    this.load.once('filecomplete-json-levels-index', (_key: string, _type: string, data: LevelIndex) => {
+      this.registry.set('levels', data.levels);
+      this.registry.set('world', data.world);
+      for (const l of data.levels) this.load.tilemapTiledJSON(l.key, l.file);
+    });
+    this.load.json('levels-index', 'levels/index.json');
   }
 
   create(): void {
     generateTextures(this);
-    this.scene.start('game', { level: 'level-1-1' });
+    this.scene.start('menu');
   }
 }

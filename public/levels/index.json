@@ -1,0 +1,30 @@
+{
+ "world": "Zlaté duny",
+ "levels": [
+  {
+   "key": "level-1-1",
+   "file": "levels/level-1-1.json",
+   "name": "Level 1"
+  },
+  {
+   "key": "level-1-2",
+   "file": "levels/level-1-2.json",
+   "name": "Level 2"
+  },
+  {
+   "key": "level-1-3",
+   "file": "levels/level-1-3.json",
+   "name": "Level 3"
+  },
+  {
+   "key": "level-1-4",
+   "file": "levels/level-1-4.json",
+   "name": "Level 4"
+  },
+  {
+   "key": "level-1-5",
+   "file": "levels/level-1-5.json",
+   "name": "Level 5"
+  }
+ ]
+}

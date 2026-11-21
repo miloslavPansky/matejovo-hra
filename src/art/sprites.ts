@@ -40,6 +40,12 @@ export const PLANT_CLOSED = [
   '..GGGGGGGG..', '............', '.....dd.....', '..LL.dd.LL..', '.LLLLddLLLL.', '..L..dd..L..', '.....dd.....',
 ];
 
+export const CACTUS_PAL: Palette = { G: '#3f9b2f', g: '#2d7421', w: '#f3f0c0' };
+export const CACTUS = [
+  '...GG...', '..GgGGw.', '.wGGgG..', '..GgGG.G', 'G.GGgGwG', 'GwGgGGGG', 'GGGGgG..', '..GgGGw.',
+  '.wGGgG..', '..GgGG..', '..GGgGw.', '.wGgGG..', '..GGgG..', '..GgGG..', '..GGGG..',
+];
+
 export const COIN_PAL: Palette = { Y: '#ffd21a', y: '#e3a600', W: '#fff6b0', o: '#a86f00' };
 export const COIN = [
   '..oooooo..', '.oYYYYYYo.', 'oYWWYYYYyo', 'oYWYYYYYyo', 'oYYYyyYYyo', 'oYYYyyYYyo', 'oYYYYYYYyo', 'oYYYYYYyyo', '.oyyyyyyo.', '..oooooo..',
@@ -57,9 +63,17 @@ export const FLAG = [
 export const FLAG_OFF_PAL: Palette = { p: '#5a4a3a', b: '#8a7a5a', F: '#a9a39a', f: '#7d776e', s: '#c9c3ba' };
 export const FLAG_ON_PAL: Palette = { p: '#5a4a3a', b: '#8a7a5a', F: '#f2c230', f: '#c9952a', s: '#fff3a0' };
 
-export const OBELISK = [
-  '....Y....', '...YYY...', '..ssSSs..', '..sSSSs..', '..sSYSs..', '..sYYYs..', '..sSYSs..', '..sSSSs..', '..sSSSs..',
-  '..sSSSs..', '..sSSSs..', '..sSSSs..', '.ssSSSss.', '.sSSSSSs.', '.sSSSSSs.', '.sSSSSSs.', '.sSSSSSs.', '.sSSSSSs.',
-  'sssssssss', 'sSSSSSSSs', 'sssssssss',
+/** Level goal: the Sun Gate, a sandstone gateway filled with warm light. */
+export const GATE = [
+  '........YYYY........',
+  '......YYyyyyYY......',
+  '.....YyyWWWWyyY.....',
+  'SSSSSSSSSSSSSSSSSSSS',
+  'SsSSsSSsSSSSsSSsSSsS',
+  'ssssssssssssssssssss',
+  // light rays fall through the doorway: bright columns (l) on a warm glow (L)
+  ...Array.from({ length: 14 }, (_, i) => (i % 2 ? '.SsSs' : '.SSSs') + 'LlLLlLLlLL' + (i % 2 ? 'SsSs.' : 'SSSs.')),
+  'SSSSSsLlLLlLLlSSSSSs',
+  'ssssssLlLLlLLlssssss',
 ];
-export const OBELISK_PAL: Palette = { Y: '#f2c230', S: '#e8d3a0', s: '#c9a86a' };
+export const GATE_PAL: Palette = { Y: '#ffd21a', y: '#e08a10', W: '#fff6c8', S: '#c99a5a', s: '#8e6634', L: '#ffb326', l: '#fff0a0' };

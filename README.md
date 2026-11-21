@@ -13,22 +13,28 @@ sbírá mince, přeskakuje štíry a masožravé rostliny a hledá cestu domů.
 | Skok (čím déle držíš, tím výš) | ↑, W nebo mezerník | tlačítko SKOK |
 | Pauza | Esc nebo P | tlačítko II nahoře |
 
-Na štíra se dá skočit shora. Masožravou rostlinu je potřeba přeskočit.
+Na štíra i masožravou rostlinu se dá skočit shora. Kaktus se musí přeskočit.
 
-## Stav prototypu (verze 0.1)
+## Stav prototypu (verze 0.2)
 
-Hotovo: jeden level (120 bloků), běh a skok, mince, štíři, rostliny, propasti, 3 srdce, checkpoint,
-cíl, dotykové ovládání a nasazení na GitHub Pages.
+Hotovo: celý první kraj Zlaté duny s 5 levely (každý 120 bloků, obtížnost postupně roste), výběr levelu,
+běh a skok, mince, štíři, masožravé rostliny, kaktusy, propasti, plošiny, 3 srdce, checkpoint,
+Sluneční brána v cíli, dotykové ovládání a nasazení na GitHub Pages.
 
-Zatím chybí: obchod, příběh a dialogy, zvuky a hudba, další levely a kraje, ukládání postupu a instalace
-jako aplikace (offline).
+Postup (odemčené levely a nejvíc sebraných mincí) se ukládá do `localStorage` prohlížeče, ne do cookies.
+Data zůstávají jen v daném prohlížeči a zařízení, neposílají se na žádný server a smažou se spolu
+s daty stránky.
+
+Zatím chybí: obchod, příběh a dialogy, zvuky a hudba, další kraje a instalace jako aplikace (offline).
 
 ## Technologie
 
 - [Phaser 3](https://phaser.io/), TypeScript a [Vite](https://vite.dev/)
 - Veškerá grafika se kreslí kódem při spuštění (`src/art`), ve stylu návrhu v0.2.
 - Levely jsou ve formátu [Tiled](https://www.mapeditor.org/) JSON (`public/levels`).
-  První level vyrábí skript `scripts/gen-level.mjs`.
+  Levely kraje 1 skládá skript `scripts/gen-level.mjs` z ručně navržených úseků (štír, rostlina, kaktus,
+  propast, plošina, kopec) a testy v `tests/` hlídají, že jsou propasti přeskočitelné a obtížnost roste.
+- Písmo Press Start 2P se kreslí jako ostré pixely (`src/ui/PixelText.ts`), jen ve velikostech 8 a 16 px.
 - CI/CD: GitHub Actions (`.github/workflows/ci-cd.yml`) u každého pushe a pull requestu ověří
   typy, testy a sestavení. Push do `main` hru nasadí na GitHub Pages.
 - Návrh hry (příběh, postavy, grafika) je v `design/navrh-hry.html`.
@@ -50,4 +56,4 @@ $w = "C:\Program Files\WSL\wslc.exe"
 S nainstalovaným Node.js 22 stačí `npm ci`, `npm run dev` a `npm run check`.
 
 Skripty: `dev` (vývojový server), `build` (složka `dist`), `typecheck`, `test` (kontrola levelů),
-`level` (znovu vygeneruje level 1-1), `check` (všechno jako v CI).
+`level` (znovu vygeneruje levely kraje 1), `check` (všechno jako v CI).

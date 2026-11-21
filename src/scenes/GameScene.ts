@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH, LIVES, PLANT_CYCLE_MS, SCORPION_SPEED, TILES } from '../config';
 import { Controls } from '../game/Controls';
 import { Player } from '../game/Player';
+import { recordCompletion, type LevelInfo } from '../game/progress';
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
@@ -11,6 +12,13 @@ export interface HudState {
   hearts: number;
   coins: number;
   total: number;
+}
+
+export interface CompleteResult {
+  coins: number;
+  total: number;
+  level: string;
+  next: string | null;
 }
 
 export const GAME_EVENTS = { hud: 'hud', toast: 'toast', complete: 'complete' } as const;
@@ -28,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   private ground!: Phaser.Tilemaps.TilemapLayer;
   private scorpions!: Phaser.Physics.Arcade.Group;
   private plants!: Phaser.Physics.Arcade.StaticGroup;
+  private cacti!: Phaser.Physics.Arcade.StaticGroup;
   private coins!: Phaser.Physics.Arcade.StaticGroup;
   private parallax: { layer: Phaser.GameObjects.TileSprite; factor: number; drift: number }[] = [];
   private hearts = LIVES;
@@ -42,8 +51,8 @@ export class GameScene extends Phaser.Scene {
     super('game');
   }
 
-  init(data: { level?: string }): void {
-    if (data.level) this.levelKey = data.level;
+  init(data?: { level?: string }): void {
+    if (data?.level) this.levelKey = data.level;
     this.hearts = LIVES;
     this.coinCount = 0;
     this.checkpointReached = false;
@@ -74,6 +83,7 @@ export class GameScene extends Phaser.Scene {
 
     this.scorpions = this.physics.add.group({ allowGravity: true });
     this.plants = this.physics.add.staticGroup();
+    this.cacti = this.physics.add.staticGroup();
     this.coins = this.physics.add.staticGroup();
     let checkpoint: Phaser.Physics.Arcade.Image | null = null;
     let finish: Phaser.Physics.Arcade.Image | null = null;
@@ -102,17 +112,25 @@ export class GameScene extends Phaser.Scene {
           const p = this.plants.create(x, y - 15, 'plant-open') as Sprite;
           (p.body as Phaser.Physics.Arcade.StaticBody).setSize(14, 22).setOffset(5, 7);
           const offset = Phaser.Math.Between(0, PLANT_CYCLE_MS);
-          this.time.addEvent({
+          const timer = this.time.addEvent({
             delay: PLANT_CYCLE_MS, startAt: offset, loop: true,
             callback: () => p.setTexture(p.texture.key === 'plant-open' ? 'plant-closed' : 'plant-open'),
           });
+          p.setData('timer', timer);
+          break;
+        }
+        case 'cactus': {
+          const k = this.cacti.create(x, y - 16, 'cactus') as Sprite;
+          (k.body as Phaser.Physics.Arcade.StaticBody).setSize(12, 27).setOffset(3, 4);
           break;
         }
         case 'checkpoint':
           checkpoint = this.physics.add.staticImage(x, y - 21, 'flag-off');
           break;
         case 'finish':
-          finish = this.physics.add.staticImage(x, y - 21, 'obelisk');
+          finish = this.physics.add.staticImage(x, y - 23, 'gate');
+          finish.setDepth(-1);
+          (finish.body as Phaser.Physics.Arcade.StaticBody).setSize(30, 40).setOffset(6, 6);
           break;
       }
     }
@@ -124,8 +142,9 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, layer);
     this.physics.add.collider(this.scorpions, layer);
     this.physics.add.overlap(this.player, this.coins, (_p, c) => this.collectCoin(c as Sprite));
-    this.physics.add.overlap(this.player, this.scorpions, (_p, s) => this.touchScorpion(s as Sprite));
-    this.physics.add.overlap(this.player, this.plants, (_p, plant) => this.hurt((plant as Sprite).x));
+    this.physics.add.overlap(this.player, this.scorpions, (_p, s) => this.touchEnemy(s as Sprite));
+    this.physics.add.overlap(this.player, this.plants, (_p, plant) => this.touchEnemy(plant as Sprite));
+    this.physics.add.overlap(this.player, this.cacti, (_p, k) => this.hurt((k as Sprite).x));
     if (checkpoint) {
       const cp = checkpoint;
       this.physics.add.overlap(this.player, cp, () => this.reachCheckpoint(cp));
@@ -203,16 +222,19 @@ export class GameScene extends Phaser.Scene {
     this.emitHud();
   }
 
-  private touchScorpion(s: Sprite): void {
-    const pb = this.player.arcadeBody, sb = s.body as Body;
-    if (!sb.enable) return;
-    if (pb.velocity.y > 0 && pb.bottom <= sb.top + 10) {
-      sb.enable = false;
+  /** Scorpions and plants: landing on top defeats them, any other touch hurts. */
+  private touchEnemy(e: Sprite): void {
+    const pb = this.player.arcadeBody;
+    const eb = e.body as Body | Phaser.Physics.Arcade.StaticBody | null;
+    if (!eb || !eb.enable) return;
+    if (pb.velocity.y > 0 && pb.bottom <= eb.top + 10) {
+      eb.enable = false;
+      (e.getData('timer') as Phaser.Time.TimerEvent | undefined)?.remove();
       this.player.bounce();
-      this.sparkle(s.x, s.y, 0xffffff);
-      this.tweens.add({ targets: s, scaleY: 0.2, alpha: 0, y: s.y + 6, duration: 300, onComplete: () => s.destroy() });
+      this.sparkle(e.x, e.y, 0xffffff);
+      this.tweens.add({ targets: e, scaleY: 0.2, alpha: 0, y: e.y + e.height * 0.35, duration: 300, onComplete: () => e.destroy() });
     } else {
-      this.hurt(s.x);
+      this.hurt(e.x);
     }
   }
 
@@ -265,6 +287,10 @@ export class GameScene extends Phaser.Scene {
     this.player.anims.stop();
     this.player.setTexture('hero-a').setAlpha(1);
     this.sparkle(this.player.x, this.player.y - 10, 0xf2c230);
-    this.game.events.emit(GAME_EVENTS.complete, { coins: this.coinCount, total: this.coinTotal });
+    const levels = (this.registry.get('levels') as LevelInfo[] | undefined) ?? [];
+    recordCompletion(levels, this.levelKey, this.coinCount);
+    const idx = levels.findIndex((l) => l.key === this.levelKey);
+    const result: CompleteResult = { coins: this.coinCount, total: this.coinTotal, level: this.levelKey, next: levels[idx + 1]?.key ?? null };
+    this.game.events.emit(GAME_EVENTS.complete, result);
   }
 }
