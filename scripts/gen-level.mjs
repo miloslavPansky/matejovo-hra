@@ -2,19 +2,23 @@
 // Every level is 480 x 17 tiles split into eight sections of about 60 tiles. Each section is one of
 // the hand-designed segment lists below (grouped into five difficulty tiers); a checkpoint follows each
 // of the first seven sections. Levels mix two neighbouring tiers, so the hardest level is as dense as
-// the hardest tier and never harder. Finally the levels are ordered by their number of hazards.
+// the hardest tier and never harder. Every level also gets one secret room under the ground.
+// Finally the levels are ordered by their number of hazards.
 // The JSON files can be edited in Tiled (https://www.mapeditor.org/) afterwards.
 import { writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const W = 480, H = 17, TILE = 16, BASE = 13, MIN_TOP = 9;
-const SAND = 1, STONE = 2, PLANK = 3, STONE2 = 4; // keep in sync with src/config.ts TILES
+const SAND = 1, STONE = 2, PLANK = 3, STONE2 = 4, FAKE = 5; // keep in sync with src/config.ts TILES
 const LEVEL_COUNT = 10;
 const SECTIONS = 8;
 const START_ZONE = 6;     // flat columns at the start
 const CHECK_ZONE = 8;     // flat columns around each checkpoint (flag at the 4th column)
 const FINISH_ZONE = 8;    // flat columns at the end
+// Secret room under the ground: 2 columns of fake sand (entrance), a 2-tile-high cavity with coins and
+// 3 one-way planks at the end that Matěj jumps up through (exit). Exactly one per level.
+const SECRET_LEN = 12, SECRET_ENTRANCE = 2, SECRET_EXIT = 3;
 // Last column each section may use; checkpoints follow at columns 59, 119, …, 419.
 const SECTION_END = Array.from({ length: SECTIONS }, (_, i) => (i < SECTIONS - 1 ? 60 * (i + 1) - 5 : W - FINISH_ZONE - 1));
 
@@ -109,6 +113,31 @@ function composeLevel(n) {
   return { n, tier, sections };
 }
 
+/**
+ * Finds the first column of the secret room: SECRET_LEN flat columns of ground with no hazard on or
+ * next to them and nothing standing on the entrance or exit. The search starts at a different place
+ * in every level and wraps around.
+ */
+function placeSecret(n, top, objects) {
+  const colOf = (o) => Math.floor(o.x / TILE);
+  const hazards = objects.filter((o) => ['scorpion', 'plant', 'cactus'].includes(o.type)).map(colOf);
+  const standing = objects.filter((o) => o.type !== 'coin').map(colOf);
+  const lo = 40, hi = W - 40 - SECRET_LEN, span = hi - lo;
+  const first = lo + ((n * 97) % span);
+  for (let k = 0; k < span; k++) {
+    const c = lo + ((first - lo + k) % span);
+    const h = top[c];
+    if (h === null || h + 3 >= H) continue;
+    let ok = true;
+    for (let i = -1; i <= SECRET_LEN && ok; i++) if (top[c + i] !== h) ok = false;
+    if (!ok || hazards.some((x) => x >= c - 2 && x <= c + SECRET_LEN + 1)) continue;
+    const ends = (x) => (x >= c && x < c + SECRET_ENTRANCE) || (x >= c + SECRET_LEN - SECRET_EXIT && x < c + SECRET_LEN);
+    if (standing.some(ends)) continue;
+    return c;
+  }
+  throw new Error(`L${n}: no room for a secret`);
+}
+
 function buildLevel(def) {
   const top = new Array(W).fill(null); // surface row per column, null = gap
   const planks = []; // [col, row]
@@ -182,6 +211,12 @@ function buildLevel(def) {
   flat(W - col);
   obj('finish', W - 4, h);
 
+  const secret = placeSecret(def.n, top, objects);
+  const sh = top[secret];
+  for (let c = secret + SECRET_ENTRANCE; c < secret + SECRET_LEN - 1; c++) coin(c, 1, sh + 3);
+  const room = { id: nextId++, name: 'tajna-mistnost', type: 'secret', x: secret * TILE, y: (sh + 1) * TILE, width: SECRET_LEN * TILE, height: 2 * TILE, rotation: 0, visible: true };
+  objects.push(room);
+
   const data = new Array(W * H).fill(0);
   for (let c = 0; c < W; c++) {
     if (top[c] === null) continue;
@@ -189,6 +224,13 @@ function buildLevel(def) {
     for (let r = top[c] + 1; r < H; r++) data[r * W + c] = (c * 7 + r * 3) % 5 === 0 ? STONE2 : STONE;
   }
   for (const [c, r] of planks) data[r * W + c] = PLANK;
+  for (let i = 0; i < SECRET_LEN; i++) {
+    const c = secret + i;
+    data[(sh + 1) * W + c] = 0;
+    data[(sh + 2) * W + c] = 0;
+    if (i < SECRET_ENTRANCE) data[sh * W + c] = FAKE;
+    else if (i >= SECRET_LEN - SECRET_EXIT) data[sh * W + c] = PLANK;
+  }
 
   return {
     compressionlevel: -1, width: W, height: H, tilewidth: TILE, tileheight: TILE, infinite: false,
@@ -199,7 +241,7 @@ function buildLevel(def) {
       { id: 1, name: 'teren', type: 'tilelayer', width: W, height: H, x: 0, y: 0, opacity: 1, visible: true, data },
       { id: 2, name: 'objekty', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects },
     ],
-    tilesets: [{ firstgid: 1, name: 'poust', image: '../tiles/poust.png', imagewidth: 64, imageheight: 16, tilewidth: 16, tileheight: 16, tilecount: 4, columns: 4, margin: 0, spacing: 0 }],
+    tilesets: [{ firstgid: 1, name: 'poust', image: '../tiles/poust.png', imagewidth: 80, imageheight: 16, tilewidth: 16, tileheight: 16, tilecount: 5, columns: 5, margin: 0, spacing: 0 }],
   };
 }
 
@@ -225,6 +267,6 @@ built.forEach(({ map, def }, i) => {
   index.push({ key, file: `levels/${key}.json`, name: `Level ${n}` });
   const objs = map.layers[1].objects;
   const count = (t) => objs.filter((o) => o.type === t).length;
-  console.log(`${key} (tier ${def.tier}): ${count('coin')} coins, ${count('scorpion')} scorpions, ${count('plant')} plants, ${count('cactus')} cacti, ${count('checkpoint')} checkpoints`);
+  console.log(`${key} (tier ${def.tier}): ${count('coin')} coins, ${count('scorpion')} scorpions, ${count('plant')} plants, ${count('cactus')} cacti, ${count('checkpoint')} checkpoints, secret at column ${objs.find((o) => o.type === 'secret').x / TILE}`);
 });
 writeFileSync(join(dir, 'index.json'), JSON.stringify({ world: 'Zlaté duny', levels: index }, null, 1) + '\n');

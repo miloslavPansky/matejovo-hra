@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'levels');
 const index = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8'));
 const MAX_GAP = 4; // tiles; a full-speed jump covers about 5
-const VALID_TILES = new Set([0, 1, 2, 3, 4]);
+const VALID_TILES = new Set([0, 1, 2, 3, 4, 5]);
+const PLANK = 3, FAKE = 5;
 const SOLID = new Set([1, 2, 4]);
 const HAZARDS = ['scorpion', 'plant', 'cactus'];
 
@@ -28,6 +29,8 @@ for (const level of index.levels) {
   const terrain = map.layers.find((l) => l.name === 'teren');
   const objects = map.layers.find((l) => l.name === 'objekty')?.objects ?? [];
   stats.push({ key: level.key, hazards: objects.filter((o) => HAZARDS.includes(o.type)).length, gaps: 0 });
+  const rooms = objects.filter((o) => o.type === 'secret');
+  const inRoom = (c) => rooms.some((r) => c >= r.x / 16 && c < (r.x + r.width) / 16);
 
   test(`${level.key}: size and layers`, () => {
     assert.equal(map.width, 480, 'every level is 480 tiles long');
@@ -53,6 +56,7 @@ for (const level of index.levels) {
     let run = 0, prev = surfaceRow(map, terrain, 0);
     const st = stats.find((s) => s.key === level.key);
     for (let c = 0; c < map.width; c++) {
+      if (inRoom(c)) continue; // the secret room is checked on its own below
       const row = surfaceRow(map, terrain, c);
       if (row === null) {
         if (run === 0) st.gaps++;
@@ -73,6 +77,28 @@ for (const level of index.levels) {
       assert.ok(row !== null, `${o.type} #${o.id} floats over a gap`);
       assert.equal(o.y, row * 16, `${o.type} #${o.id} is not on the surface`);
       for (const d of [1, 2]) assert.ok(surfaceRow(map, terrain, c - d) !== null, `${o.type} #${o.id} too close after a gap`);
+    }
+  });
+
+  test(`${level.key}: one secret room with a way in, coins and a way out`, () => {
+    assert.equal(rooms.length, 1, 'exactly one secret room');
+    const r = rooms[0];
+    const c0 = r.x / 16, len = r.width / 16, top = r.y / 16 - 1; // surface row above the room
+    const tile = (c, row) => terrain.data[row * map.width + c];
+    assert.ok(top + 3 < map.height, 'the room has a floor inside the map');
+    assert.deepEqual([tile(c0, top), tile(c0 + 1, top)], [FAKE, FAKE], 'entrance is fake sand');
+    for (let i = len - 3; i < len; i++) assert.equal(tile(c0 + i, top), PLANK, 'exit is one-way planks');
+    for (let i = 0; i < len; i++) {
+      assert.equal(tile(c0 + i, top + 1), 0, 'cavity is empty');
+      assert.equal(tile(c0 + i, top + 2), 0, 'cavity is two tiles high');
+      assert.ok(SOLID.has(tile(c0 + i, top + 3)), 'cavity has a floor');
+    }
+    for (const c of [c0 - 1, c0 + len]) assert.equal(surfaceRow(map, terrain, c), top, 'ground on both sides is level with the room');
+    const coins = objects.filter((o) => o.type === 'coin' && o.x / 16 > c0 && o.x / 16 < c0 + len && o.y > (top + 1) * 16);
+    assert.ok(coins.length >= 8, 'bonus coins inside');
+    for (const o of objects.filter((x) => HAZARDS.includes(x.type))) {
+      const c = Math.floor(o.x / 16);
+      assert.ok(c < c0 - 2 || c > c0 + len + 1, `${o.type} #${o.id} too close to the secret room`);
     }
   });
 }

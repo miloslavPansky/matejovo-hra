@@ -1,5 +1,12 @@
 // Progress and settings are stored only in this browser (localStorage, not cookies).
 // GitHub Pages serves all of the owner's projects from one origin, so every key has a prefix.
+// The rules (what a purchase or a finished level changes) live in rules.ts.
+import {
+  awardBadges, buyBoots, buyItem, completeLevel, normalizeSave, resetSave, wearOutfit,
+  type Badge, type BuyResult, type ItemId, type LevelResult, type SaveData,
+} from './rules';
+
+export type { SaveData } from './rules';
 
 export interface LevelInfo {
   key: string;
@@ -7,37 +14,16 @@ export interface LevelInfo {
   name: string;
 }
 
-export interface SaveData {
-  /** Number of unlocked levels (at least 1). */
-  unlocked: number;
-  /** Best coin count per level key. */
-  best: Record<string, number>;
-  /** All coins collected in finished levels so far (the wallet for the future shop). */
-  totalCoins: number;
-  introSeen: boolean;
-  muted: boolean;
-}
-
 const STORAGE_KEY = 'matejovo-hra:postup:v1';
-const DEFAULTS: SaveData = { unlocked: 1, best: {}, totalCoins: 0, introSeen: false, muted: false };
 
 export function loadProgress(): SaveData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const d = JSON.parse(raw) as Partial<SaveData>;
-      return {
-        unlocked: Math.max(1, Number(d.unlocked) || 1),
-        best: d.best && typeof d.best === 'object' ? d.best : {},
-        totalCoins: Math.max(0, Number(d.totalCoins) || 0),
-        introSeen: d.introSeen === true,
-        muted: d.muted === true,
-      };
-    }
+    if (raw) return normalizeSave(JSON.parse(raw));
   } catch {
-    // Storage may be unavailable (private mode); play without saving.
+    // Storage may be unavailable (private mode) or damaged; play without saving.
   }
-  return { ...DEFAULTS, best: {} };
+  return normalizeSave(null);
 }
 
 function save(d: SaveData): SaveData {
@@ -53,12 +39,35 @@ export function updateProgress(patch: Partial<SaveData>): SaveData {
   return save({ ...loadProgress(), ...patch });
 }
 
-/** Records a finished level: unlocks the next one, keeps the best score and adds coins to the wallet. */
-export function recordCompletion(levels: LevelInfo[], key: string, coins: number): SaveData {
+/** Records a finished level and returns the save plus any badges earned. */
+export function recordCompletion(levels: LevelInfo[], result: LevelResult): { save: SaveData; earned: Badge[] } {
+  const r = awardBadges(completeLevel(loadProgress(), levels.map((l) => l.key), result), result);
+  save(r.save);
+  return r;
+}
+
+export function recordSecret(key: string): void {
   const d = loadProgress();
-  const idx = levels.findIndex((l) => l.key === key);
-  if (idx >= 0) d.unlocked = Math.min(levels.length, Math.max(d.unlocked, idx + 2));
-  d.best[key] = Math.max(d.best[key] ?? 0, coins);
-  d.totalCoins += coins;
-  return save(d);
+  if (!d.secrets.includes(key)) save({ ...d, secrets: [...d.secrets, key] });
+}
+
+export function useUpItem(id: ItemId): void {
+  const d = loadProgress();
+  save({ ...d, items: { ...d.items, [id]: false } });
+}
+
+export type Purchase = { kind: 'item'; id: ItemId } | { kind: 'boots' } | { kind: 'outfit'; id: string };
+
+/** Buys in the shop. On success the save is stored and new badges (e.g. "Zákazník") are returned. */
+export function purchase(p: Purchase): (BuyResult & { earned: Badge[] }) {
+  const d = loadProgress();
+  const r = p.kind === 'item' ? buyItem(d, p.id) : p.kind === 'boots' ? buyBoots(d) : wearOutfit(d, p.id);
+  if (!r.ok) return { ...r, earned: [] };
+  const a = awardBadges(r.save);
+  save(a.save);
+  return { ok: true, save: a.save, earned: a.earned };
+}
+
+export function resetProgress(): SaveData {
+  return save(resetSave(loadProgress()));
 }

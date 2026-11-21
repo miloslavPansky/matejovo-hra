@@ -90,6 +90,11 @@ export const sfx = {
   shimmer: () => [1568, 1976, 2349].forEach((f, i) => tone(f, 0.25, 'triangle', 0.04, undefined, i * 0.09)),
   whoosh: () => { noise(1.2, 0.07, 0, 700); tone(180, 1.2, 'triangle', 0.05, 60); },
   land: () => { tone(140, 0.18, 'square', 0.08, 60); noise(0.15, 0.08, 0, 800); },
+  jet: () => noise(0.14, 0.035, 0, 600),
+  buy: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.12, 'square', 0.045, undefined, i * 0.06)),
+  badge: () => [659, 784, 988, 1319, 1568].forEach((f, i) => tone(f, i === 4 ? 0.4 : 0.12, 'triangle', 0.06, undefined, i * 0.09)),
+  armor: () => { tone(1200, 0.12, 'square', 0.05, 600); noise(0.08, 0.05, 0, 3000); },
+  deny: () => tone(200, 0.18, 'square', 0.05, 150),
 };
 
 /** A calm 8-bit desert tune: triangle lead over a soft square bass, D dorian. */

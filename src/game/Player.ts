@@ -1,16 +1,27 @@
 import Phaser from 'phaser';
-import { PLAYER } from '../config';
+import { JETPACK, PLAYER } from '../config';
 import type { ControlState } from './Controls';
 
-/** Matěj: run with acceleration, variable-height jump, coyote time and jump buffering. */
+export interface PlayerOptions {
+  /** Take-off speed, higher with the spring boots from the shop. */
+  jumpVelocity: number;
+  /** The rocket backpack is worn in this level. */
+  jetpack: boolean;
+}
+
+/** Matěj: run with acceleration, variable-height jump, coyote time, jump buffering and the backpack. */
 export class Player extends Phaser.Physics.Arcade.Sprite {
   private coyote = 0;
   private jumpBuffer = 0;
   private rising = false;
   private invulnUntil = 0;
   private stunUntil = 0;
+  /** Backpack fuel in ms; refills on the ground. */
+  fuel: number = JETPACK.fuelMs;
+  /** The backpack fired this frame (for the flame and sound). */
+  flying = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, private readonly opts: PlayerOptions) {
     super(scene, x, y, 'hero-a');
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -21,6 +32,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   get arcadeBody(): Phaser.Physics.Arcade.Body {
     return this.body as Phaser.Physics.Arcade.Body;
+  }
+
+  get hasJetpack(): boolean {
+    return this.opts.jetpack;
   }
 
   /** Advances the player one frame. Returns true when a jump started this frame. */
@@ -46,7 +61,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     if (!stunned && this.jumpBuffer > 0 && this.coyote > 0) {
-      b.setVelocityY(-PLAYER.jumpVelocity);
+      b.setVelocityY(-this.opts.jumpVelocity);
       this.jumpBuffer = 0;
       this.coyote = 0;
       this.rising = true;
@@ -57,6 +72,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.rising = false;
     }
     if (b.velocity.y >= 0) this.rising = false;
+
+    this.flying = false;
+    if (this.opts.jetpack) {
+      if (onGround) this.fuel = Math.min(JETPACK.fuelMs, this.fuel + delta * JETPACK.refill);
+      if (c.jet && !stunned && this.fuel > 0) {
+        this.flying = true;
+        this.rising = false;
+        this.fuel = Math.max(0, this.fuel - delta);
+        b.setVelocityY(Math.max(b.velocity.y - (JETPACK.thrust * delta) / 1000, -JETPACK.maxRise));
+      }
+    }
 
     if (!onGround) {
       this.anims.stop();
@@ -94,5 +120,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.coyote = 0;
     this.jumpBuffer = 0;
     this.rising = false;
+    this.fuel = JETPACK.fuelMs;
   }
 }

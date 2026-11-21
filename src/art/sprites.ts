@@ -46,8 +46,11 @@ export const CACTUS = [
   '.wGGgG..', '..GgGG..', '..GGgGw.', '.wGgGG..', '..GGgG..', '..GgGG..', '..GGGG..',
 ];
 
-// HUD buttons, 13x13 with their own frame (k = border, B = panel, w = glyph, r = red cross)
-export const ICON_PAL: Palette = { k: '#3b2a10', B: '#e9dfc4', w: '#3b2a10', r: '#c42b1c' };
+// HUD buttons and item icons, 13x13 with their own frame (k = border, B = panel, w = glyph, r = red cross)
+export const ICON_PAL: Palette = {
+  k: '#3b2a10', B: '#e9dfc4', w: '#3b2a10', r: '#c42b1c',
+  s: '#6d7681', S: '#c9d1d9', y: '#ffd21a', o: '#b8860b', p: '#f1d999', R: '#c62828', f: '#e0701c',
+};
 export const ICON_MENU = [
   'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kBBwwwwwwwBBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kBBwwwwwwwBBk',
   'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kBBwwwwwwwBBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
@@ -92,3 +95,80 @@ export const GATE = [
   'ssssssLlLLlLLlssssss',
 ];
 export const GATE_PAL: Palette = { Y: '#ffd21a', y: '#e08a10', W: '#fff6c8', S: '#c99a5a', s: '#8e6634', L: '#ffb326', l: '#fff0a0' };
+
+// ---------- 0.5: shop, items, badges ----------
+
+/** Bedřich, the merchant camel with a red fez and a blue saddle blanket. Faces left. */
+export const BEDRICH_PAL: Palette = {
+  C: '#d9a663', c: '#b07a3c', d: '#6b4423', E: '#111111', N: '#3b2a10',
+  F: '#c62828', f: '#8e1b1b', T: '#ffd21a', Y: '#ffd21a', G: '#3f7fbf', g: '#2a5a8f',
+};
+export const BEDRICH = [
+  '.FFF....................',
+  '.FFFT...................',
+  '.ffffT..................',
+  '.CCCC...................',
+  'CCECCC..................',
+  'CCCCCC.........cc.......',
+  'NCCCCC........cCCc......',
+  '.cCCCC.......cCCCCc.....',
+  '...CCC......cCCCCCCc....',
+  '...CCC.....cCCCCCCCCc...',
+  '...CCCCCCCCCCCCCCCCCCc..',
+  '...cCCCCCYYYYYYYCCCCCCc.',
+  '....CCCCCYGGgGGYCCCCCCCc',
+  '....cCCCCYGgGgGYCCCCCc.c',
+  '.....cCCCYYYYYYYCCCCc...',
+  '......ccCCCCCCCCCCcc....',
+  '......CC.CC....CC.CC....',
+  '......CC.CC....CC.CC....',
+  '......Cc.Cc....Cc.Cc....',
+  '......Cc.Cc....Cc.Cc....',
+  '.....ddd.ddd..ddd.ddd...',
+];
+
+
+export const ICON_ARMOR = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBsssssssBBk', 'kBsSSSSSSSsBk', 'kBsSSSySSSsBk', 'kBsSSyyySSsBk', 'kBsSSSySSSsBk',
+  'kBBsSSSSSsBBk', 'kBBsSSSSSsBBk', 'kBBBsSSSsBBBk', 'kBBBBsssBBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_MAGNET = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBRRRRRRRBBk', 'kBRRRRRRRRRBk', 'kBRRRBBBRRRBk', 'kBRRBBBBBRRBk', 'kBRRBBBBBRRBk',
+  'kBRRBBBBBRRBk', 'kBSSBBBBBSSBk', 'kBSSBBBBBSSBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_MAP = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBoooooooooBk', 'kBopppRpRpoBk', 'kBoppppRppoBk', 'kBopppRpRpoBk', 'kBoppwppppoBk',
+  'kBopwpppppoBk', 'kBoppwppppoBk', 'kBowppppppoBk', 'kBoooooooooBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_JET = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBBsssssBBBk', 'kBBsSSSSSsBBk', 'kBBsSRRRSsBBk', 'kBBsSSSSSsBBk', 'kBBsSSSSSsBBk',
+  'kBBsSSSSSsBBk', 'kBBBssBssBBBk', 'kBBBfyBfyBBBk', 'kBBBByBByBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_BOOTS = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBBRRRBBBBBk', 'kBBBRRRBBBBBk', 'kBBBRRRBBBBBk', 'kBBBRRRRRRBBk', 'kBBBRRRRRRRBk',
+  'kBBBsssssssBk', 'kBBBBsBsBsBBk', 'kBBBsBsBsBBBk', 'kBBBBsBsBsBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_FULL = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBwwwBBBwwwBk', 'kBwBBBBBBBwBk', 'kBwBBBBBBBwBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk',
+  'kBBBBBBBBBBBk', 'kBwBBBBBBBwBk', 'kBwBBBBBBBwBk', 'kBwwwBBBwwwBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_FULL_EXIT = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBBwBBBwBBBk', 'kBBBwBBBwBBBk', 'kBwwwBBBwwwBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk',
+  'kBBBBBBBBBBBk', 'kBwwwBBBwwwBk', 'kBBBwBBBwBBBk', 'kBBBwBBBwBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+
+/** Badge medal: gold when earned, grey while locked. */
+export const MEDAL = [
+  '.RRb...bRR.', '..RRb.bRR..', '...RRbRR...', '....RbR....', '...YYYYY...', '..YWWYYYy..', '.YWYYWYYYy.',
+  '.YYYWWWYYy.', '.YYYYWYYYy.', '.YYYWYWYyy.', '..YYYYYyy..', '...yyyyy...',
+];
+export const MEDAL_PAL: Palette = { R: '#c62828', b: '#2f6fe0', Y: '#ffd21a', y: '#c98a00', W: '#fff6b0' };
+export const MEDAL_LOCKED_PAL: Palette = { R: '#6f6a62', b: '#57534d', Y: '#9a948a', y: '#6f6a62', W: '#b8b2a8' };
+
+/** Rocket backpack worn on Matěj's back. */
+export const JETPACK = ['.ss.', 'sSSs', 'sRRs', 'sSSs', 'sSSs', 'sSSs', '.ff.'];
+export const JETPACK_PAL: Palette = { s: '#6d7681', S: '#c9d1d9', R: '#c62828', f: '#e0701c' };
+
+/** Golden arrow above a secret entrance (shown with the secret map). */
+export const ARROW = ['..YYY..', '..YYY..', '..YYY..', 'YYYYYYY', '.YYYYY.', '..YYY..', '...Y...'];
+export const ARROW_PAL: Palette = { Y: '#ffd21a' };

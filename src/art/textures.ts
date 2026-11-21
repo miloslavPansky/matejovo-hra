@@ -3,6 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { addIntroTextures } from './intro';
 import { ctx2d, makeCanvas, mix, refine, rng, sprite, texture16 } from './pixel';
 import { addSkyTextures } from './sky';
+import { outfitColors, type SaveData } from '../game/rules';
 import * as S from './sprites';
 
 /** Ground surface y (px) used when painting the background layers. */
@@ -93,20 +94,36 @@ function decoCanvas(): HTMLCanvasElement {
 }
 
 function tilesetCanvas(): HTMLCanvasElement {
-  const c = makeCanvas(64, 16);
+  const c = makeCanvas(80, 16);
   const x = ctx2d(c);
   x.drawImage(texture16(BIOME.sand, 11, 'top'), 0, 0);
   x.drawImage(texture16(BIOME.stone, 22, 'stone'), 16, 0);
   x.drawImage(texture16('#b9894a', 44, 'plank'), 32, 0);
   x.drawImage(texture16(BIOME.stone, 66, 'crack'), 48, 0);
+  x.drawImage(texture16(BIOME.sand, 11, 'top'), 64, 0); // fake sand over a secret room: same look, no collision
   return c;
+}
+
+const HERO_POSES: [string, readonly string[]][] = [['hero-a', S.HERO_A], ['hero-b', S.HERO_B], ['hero-jump', S.HERO_JUMP]];
+
+/**
+ * Repaints Matěj in the chosen cap and shirt colours. The textures are redrawn in place, so
+ * running animations and sprites keep working.
+ */
+export function paintHero(scene: Phaser.Scene, cap: [string, string], shirt: [string, string]): void {
+  const pal = { ...S.HERO_PAL, R: cap[0], r: cap[1], B: shirt[0], b: shirt[1] };
+  for (const [key, rows] of HERO_POSES) {
+    const tex = scene.textures.get(key) as Phaser.Textures.CanvasTexture;
+    const img = refine(sprite(rows, pal));
+    tex.context.clearRect(0, 0, tex.width, tex.height);
+    tex.context.drawImage(img, 0, 0);
+    tex.refresh();
+  }
 }
 
 /** Generates every texture and animation the game needs. Call once from the boot scene. */
 export function generateTextures(scene: Phaser.Scene): void {
-  addCanvas(scene, 'hero-a', refine(sprite(S.HERO_A, S.HERO_PAL)));
-  addCanvas(scene, 'hero-b', refine(sprite(S.HERO_B, S.HERO_PAL)));
-  addCanvas(scene, 'hero-jump', refine(sprite(S.HERO_JUMP, S.HERO_PAL)));
+  for (const [key, rows] of HERO_POSES) addCanvas(scene, key, refine(sprite(rows, S.HERO_PAL)));
   addCanvas(scene, 'scorp-a', refine(sprite(S.SCORP_A, S.SCORP_PAL)));
   addCanvas(scene, 'scorp-b', refine(sprite(S.SCORP_B, S.SCORP_PAL)));
   addCanvas(scene, 'plant-open', refine(sprite(S.PLANT_OPEN, S.PLANT_PAL)));
@@ -117,6 +134,11 @@ export function generateTextures(scene: Phaser.Scene): void {
   addCanvas(scene, 'gate', refine(sprite(S.GATE, S.GATE_PAL)));
   addCanvas(scene, 'heart', sprite(S.HEART, S.HEART_PAL));
   addCanvas(scene, 'heart-empty', sprite(S.HEART, S.HEART_EMPTY_PAL));
+  addCanvas(scene, 'bedrich', refine(sprite(S.BEDRICH, S.BEDRICH_PAL)));
+  addCanvas(scene, 'medal', sprite(S.MEDAL, S.MEDAL_PAL));
+  addCanvas(scene, 'medal-locked', sprite(S.MEDAL, S.MEDAL_LOCKED_PAL));
+  addCanvas(scene, 'jetpack', refine(sprite(S.JETPACK, S.JETPACK_PAL)));
+  addCanvas(scene, 'arrow', refine(sprite(S.ARROW, S.ARROW_PAL)));
 
   const coin = sprite(S.COIN, S.COIN_PAL);
   addStrip(scene, 'coin', [10, 7, 3, 7].map((w) => {
@@ -140,6 +162,11 @@ export function generateTextures(scene: Phaser.Scene): void {
   add('icon-menu', sprite(S.ICON_MENU, S.ICON_PAL));
   add('icon-sound-on', sprite(S.ICON_SOUND_ON, S.ICON_PAL));
   add('icon-sound-off', sprite(S.ICON_SOUND_OFF, S.ICON_PAL));
+  const icons: [string, readonly string[]][] = [
+    ['icon-armor', S.ICON_ARMOR], ['icon-magnet', S.ICON_MAGNET], ['icon-map', S.ICON_MAP], ['icon-jetpack', S.ICON_JET],
+    ['icon-boots', S.ICON_BOOTS], ['icon-full', S.ICON_FULL], ['icon-full-exit', S.ICON_FULL_EXIT],
+  ];
+  for (const [key, rows] of icons) add(key, sprite(rows, S.ICON_PAL));
   addCanvas(scene, 'bg-far', farCanvas());
   addCanvas(scene, 'bg-mid', midCanvas());
   addCanvas(scene, 'bg-deco', decoCanvas());
@@ -148,4 +175,9 @@ export function generateTextures(scene: Phaser.Scene): void {
   if (!anims.exists('hero-walk')) anims.create({ key: 'hero-walk', frames: [{ key: 'hero-a' }, { key: 'hero-b' }], frameRate: 8, repeat: -1 });
   if (!anims.exists('scorp-walk')) anims.create({ key: 'scorp-walk', frames: [{ key: 'scorp-a' }, { key: 'scorp-b' }], frameRate: 6, repeat: -1 });
   if (!anims.exists('coin-spin')) anims.create({ key: 'coin-spin', frames: anims.generateFrameNames('coin', { start: 0, end: 3 }), frameRate: 8, repeat: -1 });
+}
+
+/** Dresses Matěj in the cap and shirt stored in the save. */
+export function dressHero(scene: Phaser.Scene, d: Pick<SaveData, 'cap' | 'shirt'>): void {
+  paintHero(scene, outfitColors(d.cap), outfitColors(d.shirt));
 }

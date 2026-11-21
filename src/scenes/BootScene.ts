@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { generateTextures } from '../art/textures';
+import { dressHero, generateTextures } from '../art/textures';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { loadProgress, type LevelInfo } from '../game/progress';
 import { PixelText } from '../ui/PixelText';
@@ -27,6 +27,7 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     generateTextures(this);
+    dressHero(this, loadProgress());
     // First visit: play the story intro (with a "tap to start" card that also unlocks audio).
     if (loadProgress().introSeen) this.scene.start('menu');
     else this.scene.start('intro', { showCard: true });

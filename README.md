@@ -11,27 +11,37 @@ sbírá mince, přeskakuje štíry a masožravé rostliny a hledá cestu domů.
 |---|---|---|
 | Běh | ← → nebo A / D | tlačítka vlevo dole |
 | Skok (čím déle držíš, tím výš) | ↑, W nebo mezerník | tlačítko SKOK |
+| Raketový batoh (když ho máš z obchodu) | Shift | tlačítko BATOH |
 | Pauza a menu | Esc nebo P | ikona ☰ vpravo nahoře pod mincemi |
 | Zvuk zapnout / vypnout | M | ikona reproduktoru vedle menu |
-| Intro znovu | I (ve výběru levelu) | tlačítko Intro |
+| Celá obrazovka | F | ikona rohů vedle zvuku |
+| Obchod, odznaky, nastavení (v menu) | O, K, N | tlačítka dole |
+| Intro znovu | I (v menu) | Nastavení → Intro znovu |
 
 Na štíra i masožravou rostlinu se dá skočit shora. Kaktus se musí přeskočit.
 
-Vpravo nahoře je počet mincí ve tvaru *mince v tomto levelu / mince celkem*, uprostřed nahoře
-číslo levelu (například *Level 2/10*).
+Vpravo nahoře je počet mincí ve tvaru *mince v tomto levelu / mince u sebe*, uprostřed nahoře
+číslo levelu (například *Level 2/10*). Pod srdíčky jsou ikony pomůcek z obchodu, které v levelu platí.
 
-## Stav prototypu (verze 0.4)
+V obchodě velblouda Bedřicha se za mince kupují pomůcky na jeden level (raketový batoh, brnění, magnet,
+mapa tajemství), pružinové boty natrvalo a barvy kšiltovky a trička. Každý level má pod zemí tajnou
+místnost s mincemi navíc. Za úspěchy se sbírá 15 odznaků.
+
+## Stav hry (verze 0.5)
 
 Hotovo: animované intro podle příběhu (pískoviště, zlatý kámen, pád do pouště), celý první kraj
 Zlaté duny s 10 levely (každý 480 bloků se 7 checkpointy, obtížnost roste jen pozvolna), výběr levelu,
 běh a skok, mince, štíři, masožravé rostliny, kaktusy, propasti, plošiny, 3 srdce, Sluneční brána v cíli,
-8bitové zvuky a hudba s vypínačem, usměvavé slunce, dotykové ovládání a nasazení na GitHub Pages.
+8bitové zvuky a hudba s vypínačem, usměvavé slunce, obchod u Bedřicha, tajné místnosti, 15 odznaků,
+restart celé hry, celá obrazovka, dotykové ovládání a nasazení na GitHub Pages. Co přinesla která verze,
+popisuje [releases.md](releases.md).
 
-Postup (odemčené levely, nejvíc mincí v levelu, mince celkem, nastavení zvuku a zhlédnuté intro) se ukládá
-do `localStorage` prohlížeče, ne do cookies. Data zůstávají jen v daném prohlížeči a zařízení, neposílají
-se na žádný server a smažou se spolu s daty stránky.
+Postup (odemčené levely, nejvíc mincí v levelu, mince, nákupy, oblečky, odznaky, nalezené tajné místnosti,
+nastavení zvuku a zhlédnuté intro) se ukládá do `localStorage` prohlížeče, ne do cookies.
+Data zůstávají jen v daném prohlížeči a zařízení, neposílají se na žádný server a smažou se spolu s daty stránky.
 
-Zatím chybí: obchod, dialogy v levelech, další kraje a instalace jako aplikace (offline).
+Zatím chybí: další kraje, závěr příběhu, mapa světa a instalace jako aplikace (offline). Vše je
+naplánované ve verzi 0.6.
 
 ## Technologie
 
@@ -41,7 +51,10 @@ Zatím chybí: obchod, dialogy v levelech, další kraje a instalace jako aplika
   Levely kraje 1 skládá skript `scripts/gen-level.mjs` z 20 ručně navržených úseků po ~50 blocích
   (štír, rostlina, kaktus, propast, plošina, kopec) v pěti stupních obtížnosti. Každý level má 8 úseků
   ze dvou sousedních stupňů a za každým úsekem kromě posledního je checkpoint. Testy v `tests/` hlídají
-  přeskočitelné propasti, rozmístění checkpointů, strop obtížnosti a její plynulý růst.
+  přeskočitelné propasti, rozmístění checkpointů, strop obtížnosti a její plynulý růst. Každý level
+  dostane i tajnou místnost (vchod z falešného písku, dlaždice 5 bez kolize; východ z jednosměrných prken).
+- Pravidla obchodu, odznaků a formát uložené hry jsou v `src/game/rules.ts` bez závislosti na Phaseru,
+  takže je testuje přímo Node (`tests/rules.test.mjs`).
 - Písmo Press Start 2P se kreslí jako ostré pixely (`src/ui/PixelText.ts`), jen ve velikostech 8 a 16 px.
 - Zvuky a hudba se syntetizují přes Web Audio API (`src/audio/sound.ts`), nic se nestahuje.
 - CI/CD: GitHub Actions (`.github/workflows/ci-cd.yml`) u každého pushe a pull requestu ověří
@@ -64,5 +77,5 @@ $w = "C:\Program Files\WSL\wslc.exe"
 
 S nainstalovaným Node.js 22 stačí `npm ci`, `npm run dev` a `npm run check`.
 
-Skripty: `dev` (vývojový server), `build` (složka `dist`), `typecheck`, `test` (kontrola levelů),
+Skripty: `dev` (vývojový server), `build` (složka `dist`), `typecheck`, `test` (levely a pravidla hry),
 `level` (znovu vygeneruje levely kraje 1), `check` (všechno jako v CI).

@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { createSun } from '../art/sky';
 import { sfx } from '../audio/sound';
-import { GAME_HEIGHT, GAME_WIDTH, LIVES, PLANT_CYCLE_MS, SCORPION_SPEED, TILES } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, JETPACK, LIVES, MAGNET, PLANT_CYCLE_MS, PLAYER, SCORPION_SPEED, TILES } from '../config';
 import { Controls } from '../game/Controls';
 import { Player } from '../game/Player';
-import { loadProgress, recordCompletion, type LevelInfo } from '../game/progress';
+import { loadProgress, recordCompletion, recordSecret, useUpItem, type LevelInfo } from '../game/progress';
+import { jumpVelocity, type Badge, type ItemId } from '../game/rules';
 
 type Sprite = Phaser.Physics.Arcade.Sprite;
 type Body = Phaser.Physics.Arcade.Body;
@@ -15,11 +16,13 @@ export interface HudState {
   hearts: number;
   /** Coins collected in this level. */
   coins: number;
-  /** Coins collected in all finished levels plus this level so far. */
+  /** Coins in the wallet before this level plus this level so far. */
   wallet: number;
   /** 1-based level number and the number of levels in the world. */
   level: number;
   levelCount: number;
+  /** Shop items active in this level. */
+  items: Record<ItemId, boolean>;
 }
 
 export interface CompleteResult {
@@ -28,9 +31,10 @@ export interface CompleteResult {
   wallet: number;
   level: string;
   next: string | null;
+  badges: Badge[];
 }
 
-export const GAME_EVENTS = { hud: 'hud', toast: 'toast', complete: 'complete' } as const;
+export const GAME_EVENTS = { hud: 'hud', toast: 'toast', complete: 'complete', fuel: 'fuel' } as const;
 
 function numProp(o: TiledObject, name: string, fallback: number): number {
   const props = o.properties as { name: string; value: unknown }[] | undefined;
@@ -57,6 +61,15 @@ export class GameScene extends Phaser.Scene {
   private checkpointTotal = 0;
   private finished = false;
   private mapHeight = 0;
+  private items: Record<ItemId, boolean> = { jetpack: false, armor: false, magnet: false, map: false };
+  private boots = 0;
+  private hits = 0;
+  private stomps = { scorpion: 0, plant: 0 };
+  private secretFound = false;
+  private secretCover: Phaser.GameObjects.TileSprite | null = null;
+  private jetpack: { pack: Phaser.GameObjects.Image; flame: Phaser.GameObjects.Particles.ParticleEmitter } | null = null;
+  private lastFuel = -1;
+  private nextJetSound = 0;
 
   constructor() {
     super('game');
@@ -69,7 +82,16 @@ export class GameScene extends Phaser.Scene {
     this.checkpointsReached = 0;
     this.finished = false;
     this.parallax = [];
-    this.walletBefore = loadProgress().totalCoins;
+    this.hits = 0;
+    this.stomps = { scorpion: 0, plant: 0 };
+    this.secretFound = false;
+    this.secretCover = null;
+    this.jetpack = null;
+    this.lastFuel = -1;
+    const save = loadProgress();
+    this.walletBefore = save.wallet;
+    this.items = { ...save.items };
+    this.boots = save.boots;
   }
 
   private get levels(): LevelInfo[] {
@@ -87,6 +109,7 @@ export class GameScene extends Phaser.Scene {
     const layer = map.createLayer('teren', tileset, 0, 0);
     if (!layer) throw new Error('Layer "teren" is missing in the level file');
     this.ground = layer;
+    // Fake sand (the secret room entrance) has no collision on purpose.
     layer.setCollision([TILES.sand, TILES.stone, TILES.stone2, TILES.plank]);
     layer.forEachTile((t) => {
       if (t.index === TILES.plank) t.setCollision(false, false, true, false); // one-way platform
@@ -95,7 +118,8 @@ export class GameScene extends Phaser.Scene {
     const W = map.widthInPixels;
     this.mapHeight = map.heightInPixels;
     this.physics.world.setBounds(0, 0, W, this.mapHeight + 200);
-    this.physics.world.setBoundsCollision(true, true, false, false);
+    // Sides and top are walls (the backpack must not fly out of the level), the bottom is open for gaps.
+    this.physics.world.setBoundsCollision(true, true, true, false);
 
     this.scorpions = this.physics.add.group({ allowGravity: true });
     this.plants = this.physics.add.staticGroup();
@@ -103,6 +127,7 @@ export class GameScene extends Phaser.Scene {
     this.coins = this.physics.add.staticGroup();
     const checkpoints = this.physics.add.staticGroup();
     let finish: Phaser.Physics.Arcade.Image | null = null;
+    let secret: Phaser.GameObjects.Zone | null = null;
 
     const objects = map.getObjectLayer('objekty')?.objects ?? [];
     for (const o of objects) {
@@ -119,7 +144,7 @@ export class GameScene extends Phaser.Scene {
         case 'scorpion': {
           const s = this.scorpions.create(x, y - 9, 'scorp-a') as Sprite;
           const range = numProp(o, 'range', 48);
-          s.setData({ min: x - range, max: x + range, dir: -1 });
+          s.setData({ min: x - range, max: x + range, dir: -1, kind: 'scorpion' });
           (s.body as Body).setSize(26, 12).setOffset(4, 6);
           s.play('scorp-walk');
           break;
@@ -131,7 +156,7 @@ export class GameScene extends Phaser.Scene {
             delay: PLANT_CYCLE_MS, startAt: Phaser.Math.Between(0, PLANT_CYCLE_MS), loop: true,
             callback: () => p.setTexture(p.texture.key === 'plant-open' ? 'plant-closed' : 'plant-open'),
           });
-          p.setData('timer', timer);
+          p.setData({ timer, kind: 'plant' });
           break;
         }
         case 'cactus': {
@@ -147,13 +172,30 @@ export class GameScene extends Phaser.Scene {
           finish.setDepth(-1);
           (finish.body as StaticBody).setSize(30, 40).setOffset(6, 6);
           break;
+        case 'secret': {
+          const w = o.width ?? 0, h = o.height ?? 0;
+          secret = this.add.zone(x + w / 2, y + h / 2, w, h);
+          this.physics.add.existing(secret, true);
+          // Solid-looking rock hides the room until Matěj falls in.
+          this.secretCover = this.add.tileSprite(x, y, w, h, 'tiles', 'stone').setOrigin(0).setDepth(11);
+          // The secret map shows a bobbing golden arrow above the hidden entrance.
+          if (this.items.map) {
+            const arrow = this.add.image(x + 16, y - 16 - 14, 'arrow').setDepth(5);
+            this.tweens.add({ targets: arrow, y: arrow.y - 5, duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+          }
+          break;
+        }
       }
     }
     this.coinTotal = this.coins.getLength();
     this.checkpointTotal = checkpoints.getLength();
 
-    this.player = new Player(this, this.spawn.x, this.spawn.y);
+    this.player = new Player(this, this.spawn.x, this.spawn.y, {
+      jumpVelocity: jumpVelocity(PLAYER.jumpVelocity, this.boots),
+      jetpack: this.items.jetpack,
+    });
     this.controls = new Controls(this);
+    if (this.items.jetpack) this.createJetpack();
 
     this.physics.add.collider(this.player, layer);
     this.physics.add.collider(this.scorpions, layer);
@@ -163,6 +205,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.cacti, (_p, k) => this.hurt((k as Sprite).x));
     this.physics.add.overlap(this.player, checkpoints, (_p, f) => this.reachCheckpoint(f as Sprite));
     if (finish) this.physics.add.overlap(this.player, finish, () => this.completeLevel());
+    if (secret) this.physics.add.overlap(this.player, secret, () => this.findSecret());
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, W, Math.max(GAME_HEIGHT, this.mapHeight));
@@ -187,12 +230,23 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private createJetpack(): void {
+    const pack = this.add.image(this.player.x, this.player.y, 'jetpack').setDepth(9);
+    const flame = this.add.particles(0, 0, 'spark', {
+      speed: { min: 20, max: 60 }, angle: { min: 75, max: 105 }, lifespan: 260, frequency: 25,
+      scale: { start: 1.6, end: 0 }, tint: [0xffd21a, 0xf08a24, 0xe0501c], emitting: false,
+    }).setDepth(8);
+    this.jetpack = { pack, flame };
+  }
+
   update(time: number, delta: number): void {
     const cam = this.cameras.main;
     for (const p of this.parallax) p.layer.tilePositionX = Math.round(cam.scrollX * p.factor + (time / 1000) * p.drift);
     if (this.finished) return;
 
     if (this.player.step(this.controls.read(), time, delta)) sfx.jump();
+    this.updateJetpack(time);
+    if (this.items.magnet) this.pullCoins(delta);
 
     for (const obj of this.scorpions.getChildren()) {
       const s = obj as Sprite;
@@ -212,11 +266,47 @@ export class GameScene extends Phaser.Scene {
     if (this.player.y > this.mapHeight + 24) this.fellIntoGap();
   }
 
+  private updateJetpack(time: number): void {
+    if (!this.jetpack) return;
+    const p = this.player;
+    const back = p.flipX ? 6 : -6;
+    this.jetpack.pack.setPosition(p.x + back, p.y + 3).setFlipX(p.flipX).setAlpha(p.alpha);
+    this.jetpack.flame.setPosition(p.x + back, p.y + 12);
+    this.jetpack.flame.emitting = p.flying;
+    if (p.flying && time >= this.nextJetSound) {
+      sfx.jet();
+      this.nextJetSound = time + 130;
+    }
+    const fuel = Math.round((p.fuel / JETPACK.fuelMs) * 50) / 50;
+    if (fuel !== this.lastFuel) {
+      this.lastFuel = fuel;
+      this.game.events.emit(GAME_EVENTS.fuel, fuel);
+    }
+  }
+
+  /** Magnet: coins near Matěj fly to him. */
+  private pullCoins(delta: number): void {
+    const px = this.player.x, py = this.player.y, r = MAGNET.radius;
+    const step = (MAGNET.speed * delta) / 1000;
+    for (const obj of this.coins.getChildren()) {
+      const c = obj as Sprite;
+      const dx = px - c.x;
+      if (dx > r || dx < -r) continue;
+      const body = c.body as StaticBody | null;
+      if (!c.active || !body || !body.enable) continue;
+      const dy = py - c.y, d = Math.hypot(dx, dy);
+      if (d > r || d < 1) continue;
+      const k = Math.min(1, step / d);
+      c.setPosition(c.x + dx * k, c.y + dy * k);
+      body.updateFromGameObject();
+    }
+  }
+
   private emitHud(): void {
     const idx = this.levels.findIndex((l) => l.key === this.levelKey);
     const state: HudState = {
       hearts: this.hearts, coins: this.coinCount, wallet: this.walletBefore + this.coinCount,
-      level: idx + 1, levelCount: this.levels.length,
+      level: idx + 1, levelCount: this.levels.length, items: { ...this.items },
     };
     this.game.events.emit(GAME_EVENTS.hud, state);
   }
@@ -241,6 +331,15 @@ export class GameScene extends Phaser.Scene {
     this.emitHud();
   }
 
+  private findSecret(): void {
+    if (this.secretFound) return;
+    this.secretFound = true;
+    recordSecret(this.levelKey);
+    if (this.secretCover) this.tweens.add({ targets: this.secretCover, alpha: 0, duration: 350 });
+    sfx.shimmer();
+    this.game.events.emit(GAME_EVENTS.toast, 'Tajná místnost!');
+  }
+
   /** Scorpions and plants: landing on top defeats them, any other touch hurts. */
   private touchEnemy(e: Sprite): void {
     const pb = this.player.arcadeBody;
@@ -249,6 +348,7 @@ export class GameScene extends Phaser.Scene {
     if (pb.velocity.y > 0 && pb.bottom <= eb.top + 10) {
       eb.enable = false;
       (e.getData('timer') as Phaser.Time.TimerEvent | undefined)?.remove();
+      this.stomps[e.getData('kind') === 'plant' ? 'plant' : 'scorpion']++;
       this.player.bounce();
       sfx.stomp();
       this.sparkle(e.x, e.y, 0xffffff);
@@ -261,9 +361,21 @@ export class GameScene extends Phaser.Scene {
   private hurt(fromX: number): void {
     const now = this.time.now;
     if (this.finished || this.player.isInvulnerable(now)) return;
+    this.hits++;
+    this.cameras.main.shake(120, 0.004);
+    if (this.items.armor) {
+      // Armor takes the hit instead of a heart and is used up.
+      this.items.armor = false;
+      useUpItem('armor');
+      sfx.armor();
+      this.sparkle(this.player.x, this.player.y - 6, 0xc9d1d9);
+      this.player.hit(fromX, now);
+      this.game.events.emit(GAME_EVENTS.toast, 'Brnění tě ochránilo!');
+      this.emitHud();
+      return;
+    }
     this.hearts--;
     sfx.hurt();
-    this.cameras.main.shake(120, 0.004);
     if (this.hearts <= 0) {
       this.outOfHearts();
     } else {
@@ -273,6 +385,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private fellIntoGap(): void {
+    this.hits++;
     this.hearts--;
     sfx.fall();
     if (this.hearts <= 0) {
@@ -311,14 +424,19 @@ export class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.player.anims.stop();
     this.player.setTexture('hero-a').setAlpha(1);
+    if (this.jetpack) this.jetpack.flame.emitting = false;
     sfx.complete();
     this.sparkle(this.player.x, this.player.y - 10, 0xf2c230);
     const levels = this.levels;
-    const saved = recordCompletion(levels, this.levelKey, this.coinCount);
+    const { save, earned } = recordCompletion(levels, {
+      key: this.levelKey, coins: this.coinCount, coinTotal: this.coinTotal, hits: this.hits, stomps: this.stomps,
+    });
     const idx = levels.findIndex((l) => l.key === this.levelKey);
     const result: CompleteResult = {
-      coins: this.coinCount, total: this.coinTotal, wallet: saved.totalCoins, level: this.levelKey, next: levels[idx + 1]?.key ?? null,
+      coins: this.coinCount, total: this.coinTotal, wallet: save.wallet, level: this.levelKey,
+      next: levels[idx + 1]?.key ?? null, badges: earned,
     };
+    if (earned.length) this.time.delayedCall(700, () => sfx.badge());
     this.game.events.emit(GAME_EVENTS.complete, result);
   }
 }
