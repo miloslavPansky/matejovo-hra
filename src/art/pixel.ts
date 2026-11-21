@@ -45,6 +45,22 @@ export function mix(a: string, b: string, f: number): string {
   return toHex(A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f);
 }
 
+/** Pixel-exact filled ellipse (no anti-aliasing). */
+export function fillEllipse(x: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, col: string): void {
+  x.fillStyle = col;
+  for (let j = Math.floor(-ry); j <= Math.ceil(ry); j++) {
+    for (let i = Math.floor(-rx); i <= Math.ceil(rx); i++) {
+      if ((i * i) / (rx * rx) + (j * j) / (ry * ry) <= 1.02) x.fillRect(Math.round(cx + i), Math.round(cy + j), 1, 1);
+    }
+  }
+}
+
+/** Ordered 4x4 Bayer dithering threshold in [0, 1). */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+export function dither(i: number, j: number, f: number): boolean {
+  return f * 16 > BAYER[(i & 3) + ((j & 3) << 2)] + 0.5;
+}
+
 /** Draws a sprite from rows of palette characters ('.' = transparent). */
 export function sprite(rows: readonly string[], pal: Palette): HTMLCanvasElement {
   const w = Math.max(...rows.map((r) => r.length));

@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { addIntroTextures } from './intro';
 import { ctx2d, makeCanvas, mix, refine, rng, sprite, texture16 } from './pixel';
+import { addSkyTextures } from './sky';
 import * as S from './sprites';
 
 /** Ground surface y (px) used when painting the background layers. */
 const HORIZON = 208;
 
 const BIOME = {
-  sky: ['#5fb2ff', '#bfe6ff'] as const,
   sand: '#e8c872',
   stone: '#d1a95a',
   dune: '#f1d999',
@@ -36,37 +37,6 @@ function addStrip(scene: Phaser.Scene, key: string, frames: HTMLCanvasElement[])
 function duneHeight(x: number, amp: number, seed: number): number {
   const k = (2 * Math.PI) / GAME_WIDTH;
   return Math.round(((Math.sin(x * k * 2 + seed) * 0.5 + Math.sin(x * k * 5 + seed * 2) * 0.25 + 0.75) * amp) / 2) * 2;
-}
-
-function skyCanvas(): HTMLCanvasElement {
-  const c = makeCanvas(GAME_WIDTH, GAME_HEIGHT);
-  const x = ctx2d(c);
-  const bands = 8;
-  for (let i = 0; i < bands; i++) {
-    x.fillStyle = mix(BIOME.sky[0], BIOME.sky[1], i / (bands - 1));
-    x.fillRect(0, Math.floor((i * HORIZON) / bands), GAME_WIDTH, Math.ceil(HORIZON / bands) + 1);
-  }
-  x.fillStyle = BIOME.sky[1];
-  x.fillRect(0, HORIZON, GAME_WIDTH, GAME_HEIGHT - HORIZON);
-  x.fillStyle = '#fff3a0';
-  // sun: right of the menu title and below the HUD coin counter
-  x.fillRect(412, 40, 30, 30);
-  x.fillStyle = '#fffbe0';
-  x.fillRect(419, 47, 16, 16);
-  return c;
-}
-
-function cloudsCanvas(): HTMLCanvasElement {
-  const c = makeCanvas(GAME_WIDTH, 100);
-  const x = ctx2d(c);
-  for (const [cx, cy, w] of [[30, 30, 56], [190, 16, 72], [340, 52, 44]] as const) {
-    x.fillStyle = 'rgba(255,255,255,0.9)';
-    x.fillRect(cx, cy, w, 8);
-    x.fillRect(cx + 8, cy - 6, w - 24, 6);
-    x.fillStyle = 'rgba(220,235,250,0.9)';
-    x.fillRect(cx + 4, cy + 8, w - 8, 2);
-  }
-  return c;
 }
 
 function farCanvas(): HTMLCanvasElement {
@@ -164,8 +134,12 @@ export function generateTextures(scene: Phaser.Scene): void {
   const tiles = addCanvas(scene, 'tiles', tilesetCanvas());
   tiles.add('sand', 0, 0, 0, 16, 16);
   tiles.add('stone', 0, 16, 0, 16, 16);
-  addCanvas(scene, 'bg-sky', skyCanvas());
-  addCanvas(scene, 'bg-clouds', cloudsCanvas());
+  const add = (key: string, c: HTMLCanvasElement) => { addCanvas(scene, key, c); };
+  addSkyTextures(scene, add);
+  addIntroTextures(add);
+  add('icon-menu', sprite(S.ICON_MENU, S.ICON_PAL));
+  add('icon-sound-on', sprite(S.ICON_SOUND_ON, S.ICON_PAL));
+  add('icon-sound-off', sprite(S.ICON_SOUND_OFF, S.ICON_PAL));
   addCanvas(scene, 'bg-far', farCanvas());
   addCanvas(scene, 'bg-mid', midCanvas());
   addCanvas(scene, 'bg-deco', decoCanvas());

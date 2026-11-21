@@ -1,7 +1,7 @@
 {
   "name": "matejovo-hra",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Matěj a Zlatá poušť: pixelová plošinovka do prohlížeče",
   "type": "module",
   "scripts": {

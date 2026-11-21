@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { createSun } from '../art/sky';
+import { isMuted, onMutedChange, sfx, toggleMuted } from '../audio/sound';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { loadProgress, type LevelInfo } from '../game/progress';
 import { PixelText } from '../ui/PixelText';
@@ -8,6 +10,7 @@ export class MenuScene extends Phaser.Scene {
   private selected = 0;
   private tiles: { box: Phaser.GameObjects.Rectangle; locked: boolean }[] = [];
   private levels: LevelInfo[] = [];
+  private clouds: Phaser.GameObjects.TileSprite[] = [];
 
   constructor() {
     super('menu');
@@ -19,6 +22,11 @@ export class MenuScene extends Phaser.Scene {
     this.tiles = [];
 
     this.add.image(0, 0, 'bg-sky').setOrigin(0);
+    createSun(this, 30, 32, 1);
+    this.clouds = [
+      this.add.tileSprite(0, 0, GAME_WIDTH, 110, 'bg-clouds-far').setOrigin(0),
+      this.add.tileSprite(0, 0, GAME_WIDTH, 110, 'bg-clouds').setOrigin(0),
+    ];
     this.add.image(0, 0, 'bg-far').setOrigin(0);
     this.add.image(0, 0, 'bg-mid').setOrigin(0);
     for (let x = 0; x < GAME_WIDTH; x += 16) {
@@ -30,6 +38,17 @@ export class MenuScene extends Phaser.Scene {
 
     new PixelText(this, GAME_WIDTH / 2, 34, 'Matěj a Zlatá poušť', { size: 16, color: '#ffe9b0' }).setOrigin(0.5);
     new PixelText(this, GAME_WIDTH / 2, 62, `Kraj 1 · ${String(this.registry.get('world') ?? 'Zlaté duny')}`, { size: 8 }).setOrigin(0.5);
+    this.add.sprite(GAME_WIDTH / 2 - 60, 182, 'coin', '0').play('coin-spin');
+    new PixelText(this, GAME_WIDTH / 2 - 50, 182, `Mince celkem: ${progress.totalCoins}`, { size: 8 }).setOrigin(0, 0.5);
+
+    // Bottom-left buttons: intro replay and sound on/off.
+    const introBtn = new PixelText(this, 8, GAME_HEIGHT - 8, 'Intro (I)', { size: 8, color: '#3b2a10', shadow: null, background: '#e9dfc4', padding: 4 })
+      .setOrigin(0, 1).setInteractive({ useHandCursor: true });
+    introBtn.on('pointerdown', () => this.playIntro());
+    const sound = this.add.image(GAME_WIDTH - 22, 6, isMuted() ? 'icon-sound-off' : 'icon-sound-on').setOrigin(0);
+    this.add.zone(GAME_WIDTH - 16, 12, 22, 22).setInteractive({ useHandCursor: true }).on('pointerdown', () => { toggleMuted(); sfx.click(); });
+    const off = onMutedChange((m) => sound.setTexture(m ? 'icon-sound-off' : 'icon-sound-on'));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
 
     const n = this.levels.length;
     const w = 64, gap = 12, x0 = GAME_WIDTH / 2 - ((n * w + (n - 1) * gap) / 2) + w / 2;
@@ -51,7 +70,7 @@ export class MenuScene extends Phaser.Scene {
     this.selected = Math.min(progress.unlocked, n) - 1;
     this.highlight();
 
-    new PixelText(this, GAME_WIDTH / 2, 166, 'Vyber level šipkami a Enterem, nebo na něj klepni.', { size: 8 }).setOrigin(0.5);
+    new PixelText(this, GAME_WIDTH / 2, 162, 'Vyber level šipkami a Enterem, nebo na něj klepni.', { size: 8 }).setOrigin(0.5);
     new PixelText(this, GAME_WIDTH - 4, GAME_HEIGHT - 4, `verze ${__APP_VERSION__}`, { size: 8, color: '#3b2a10', shadow: null }).setOrigin(1);
 
     const kb = this.input.keyboard;
@@ -59,6 +78,16 @@ export class MenuScene extends Phaser.Scene {
     kb?.on('keydown-RIGHT', () => this.move(1));
     kb?.on('keydown-ENTER', () => this.startLevel(this.selected));
     kb?.on('keydown-SPACE', () => this.startLevel(this.selected));
+    kb?.on('keydown-I', () => this.playIntro());
+    kb?.on('keydown-M', () => toggleMuted());
+  }
+
+  update(time: number): void {
+    this.clouds.forEach((c, i) => { c.tilePositionX = Math.round((time / 1000) * (i ? 5 : 2)); });
+  }
+
+  private playIntro(): void {
+    this.scene.start('intro');
   }
 
   private move(d: number): void {
@@ -75,6 +104,7 @@ export class MenuScene extends Phaser.Scene {
   private startLevel(i: number): void {
     const l = this.levels[i];
     if (!l || this.tiles[i]?.locked) return;
+    sfx.click();
     this.scene.start('game', { level: l.key });
   }
 }

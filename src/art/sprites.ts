@@ -46,6 +46,21 @@ export const CACTUS = [
   '.wGGgG..', '..GgGG..', '..GGgGw.', '.wGgGG..', '..GGgG..', '..GgGG..', '..GGGG..',
 ];
 
+// HUD buttons, 13x13 with their own frame (k = border, B = panel, w = glyph, r = red cross)
+export const ICON_PAL: Palette = { k: '#3b2a10', B: '#e9dfc4', w: '#3b2a10', r: '#c42b1c' };
+export const ICON_MENU = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kBBwwwwwwwBBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kBBwwwwwwwBBk',
+  'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kBBwwwwwwwBBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_SOUND_ON = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBBBwBBBwBBk', 'kBBBwwBBBBwBk', 'kBwwwwBwBBwBk', 'kBwwwwBBwBwBk', 'kBwwwwBBwBwBk',
+  'kBwwwwBwBBwBk', 'kBBBwwBBBBwBk', 'kBBBBwBBBwBBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+export const ICON_SOUND_OFF = [
+  'kkkkkkkkkkkkk', 'kBBBBBBBBBBBk', 'kBBBBwBBBBBBk', 'kBBBwwBBBBBBk', 'kBwwwwBrBBrBk', 'kBwwwwBBrrBBk', 'kBwwwwBBrrBBk',
+  'kBwwwwBrBBrBk', 'kBBBwwBBBBBBk', 'kBBBBwBBBBBBk', 'kBBBBBBBBBBBk', 'kBBBBBBBBBBBk', 'kkkkkkkkkkkkk',
+];
+
 export const COIN_PAL: Palette = { Y: '#ffd21a', y: '#e3a600', W: '#fff6b0', o: '#a86f00' };
 export const COIN = [
   '..oooooo..', '.oYYYYYYo.', 'oYWWYYYYyo', 'oYWYYYYYyo', 'oYYYyyYYyo', 'oYYYyyYYyo', 'oYYYYYYYyo', 'oYYYYYYyyo', '.oyyyyyyo.', '..oooooo..',

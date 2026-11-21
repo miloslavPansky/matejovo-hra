@@ -30,18 +30,18 @@ for (const level of index.levels) {
   stats.push({ key: level.key, hazards: objects.filter((o) => HAZARDS.includes(o.type)).length, gaps: 0 });
 
   test(`${level.key}: size and layers`, () => {
-    assert.equal(map.width, 120, 'every level is 120 tiles long');
+    assert.equal(map.width, 240, 'every level is 240 tiles long');
     assert.equal(map.tilewidth, 16);
     assert.ok(terrain, 'tile layer "teren" exists');
     assert.equal(terrain.data.length, map.width * map.height);
     for (const id of terrain.data) assert.ok(VALID_TILES.has(id), `unknown tile id ${id}`);
   });
 
-  test(`${level.key}: start, checkpoint in the middle, finish`, () => {
-    for (const type of ['start', 'checkpoint', 'finish']) assert.equal(objects.filter((o) => o.type === type).length, 1, `exactly one ${type}`);
-    const cp = objects.find((o) => o.type === 'checkpoint');
-    const col = Math.floor(cp.x / 16);
-    assert.ok(col >= 50 && col <= 70, `checkpoint near the middle (column ${col})`);
+  test(`${level.key}: start, three evenly spaced checkpoints, finish`, () => {
+    for (const type of ['start', 'finish']) assert.equal(objects.filter((o) => o.type === type).length, 1, `exactly one ${type}`);
+    const cps = objects.filter((o) => o.type === 'checkpoint').map((o) => Math.floor(o.x / 16)).sort((a, b) => a - b);
+    assert.equal(cps.length, 3, 'three checkpoints');
+    [60, 120, 180].forEach((target, i) => assert.ok(Math.abs(cps[i] - target) <= 8, `checkpoint ${i + 1} near column ${target} (is ${cps[i]})`));
   });
 
   test(`${level.key}: objects inside the map, scorpions have a range`, () => {

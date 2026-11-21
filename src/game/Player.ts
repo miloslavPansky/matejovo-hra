@@ -23,9 +23,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.body as Phaser.Physics.Arcade.Body;
   }
 
-  step(c: ControlState, now: number, delta: number): void {
+  /** Advances the player one frame. Returns true when a jump started this frame. */
+  step(c: ControlState, now: number, delta: number): boolean {
     const b = this.arcadeBody;
-    const onGround = b.blocked.down || b.touching.down;
+    // Only real terrain counts as ground. Arcade overlaps (coins, enemies) also set
+    // body.touching.down, which used to let Matěj jump again off a coin in mid-air.
+    const onGround = b.blocked.down;
+    let jumped = false;
     this.coyote = onGround ? PLAYER.coyoteMs : this.coyote - delta;
     this.jumpBuffer = c.jumpPressed ? PLAYER.jumpBufferMs : this.jumpBuffer - delta;
 
@@ -46,6 +50,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.jumpBuffer = 0;
       this.coyote = 0;
       this.rising = true;
+      jumped = true;
     }
     if (this.rising && !c.jump && b.velocity.y < 0) {
       b.setVelocityY(b.velocity.y * PLAYER.jumpCut);
@@ -64,6 +69,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.setAlpha(now < this.invulnUntil ? (Math.floor(now / 80) % 2 ? 0.35 : 1) : 1);
+    return jumped;
   }
 
   bounce(): void {
