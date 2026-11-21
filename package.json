@@ -1,0 +1,26 @@
+{
+  "name": "matejovo-hra",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Matěj a Zlatá poušť: pixelová plošinovka do prohlížeče",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "level": "node scripts/gen-level.mjs",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.3.8"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

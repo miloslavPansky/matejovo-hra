@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1b1206" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Matěj a Zlatá poušť</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #1b1206; overflow: hidden; }
+      body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+      #game { position: fixed; inset: 0; }
+      #game canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+      #rotate {
+        display: none; position: fixed; inset: 0; z-index: 10; background: #1b1206; color: #ffe9b0;
+        font-family: "Pixelify Sans", monospace; font-size: 22px; text-align: center; padding: 24px;
+        align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+      }
+      #rotate .phone { width: 44px; height: 76px; border: 4px solid #ffe9b0; border-radius: 8px; animation: turn 2s ease-in-out infinite; }
+      @keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+      @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+      @media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(-90deg); } }
+    </style>
+  </head>
+  <body>
+    <div id="game" oncontextmenu="return false"></div>
+    <div id="rotate" role="alert"><div class="phone"></div><div>Otoč telefon na šířku</div></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

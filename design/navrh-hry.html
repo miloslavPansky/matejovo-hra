@@ -1,0 +1,791 @@
+<title>Matěj a Zlatá poušť</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: one reading column of "inventory panels" (pixel GUI bevels) on sand ground; canvases render pixel art at native game resolution 480x270, scaled with pixelated rendering. */
+:root{
+  --bg:#ecdfbc; --bg2:#e3d3a8; --fg:#2b2116; --muted:#6d5c43;
+  --panel:#d3cbb5; --panel-hi:#f6f1e3; --panel-lo:#857b66; --slot:#a89f8a;
+  --line:#bfae86; --accent:#c42b1c; --accent2:#2456c8; --gold:#a87700; --ok:#3a8a24; --okbg:#d9edc9; --warn:#a85a00; --warnbg:#f6e2b8;
+  --font-display:"Pixelify Sans","Courier New",monospace;
+  --font-body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151827; --bg2:#1c2034; --fg:#ece4d0; --muted:#a49b87;
+  --panel:#2a2e43; --panel-hi:#464c6e; --panel-lo:#0e1019; --slot:#1d2031;
+  --line:#3a3f5a; --accent:#ff5d4a; --accent2:#7aa2ff; --gold:#ffc63a; --ok:#7fd35f; --okbg:#22331f; --warn:#ffb54a; --warnbg:#3a2c14; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151827; --bg2:#1c2034; --fg:#ece4d0; --muted:#a49b87;
+  --panel:#2a2e43; --panel-hi:#464c6e; --panel-lo:#0e1019; --slot:#1d2031;
+  --line:#3a3f5a; --accent:#ff5d4a; --accent2:#7aa2ff; --gold:#ffc63a; --ok:#7fd35f; --okbg:#22331f; --warn:#ffb54a; --warnbg:#3a2c14; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 64px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:44px}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:clamp(2rem,6vw,3.4rem);line-height:1.05;margin:0}
+h2{font-size:clamp(1.5rem,3.6vw,2rem);margin:0;line-height:1.15}
+h3{font-size:1.2rem;margin:0}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.12em;font-size:.8rem;color:var(--muted)}
+.lead{font-size:1.12rem}
+.muted{color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:14px}
+.sec{display:flex;flex-direction:column;gap:18px}
+.sec-head{display:flex;flex-direction:column;gap:6px}
+a{color:var(--accent2)}
+:focus-visible{outline:3px solid var(--accent2);outline-offset:2px}
+
+.panel{background:var(--panel);border:3px solid var(--panel-lo);box-shadow:inset 3px 3px 0 var(--panel-hi),inset -3px -3px 0 rgba(0,0,0,.18);padding:18px}
+.slot{background:var(--slot);box-shadow:inset 3px 3px 0 rgba(0,0,0,.25),inset -3px -3px 0 var(--panel-hi)}
+canvas.pix{image-rendering:pixelated;image-rendering:crisp-edges;display:block;width:100%;height:auto;max-width:100%}
+
+nav.toc{display:flex;flex-wrap:wrap;gap:8px}
+nav.toc a{font-family:var(--font-display);text-decoration:none;color:var(--fg);padding:6px 12px;background:var(--panel);border:2px solid var(--panel-lo);box-shadow:inset 2px 2px 0 var(--panel-hi)}
+nav.toc a:hover{background:var(--panel-hi)}
+
+.scene{position:relative;border:4px solid #1b1206;background:#7ec8ff}
+.hud{position:absolute;inset:0;pointer-events:none;font-family:var(--font-display);color:#fff;text-shadow:2px 2px 0 #3b2a10}
+.hud .tl{position:absolute;left:2%;top:4%;display:flex;gap:4px;align-items:center}
+.hud .tr{position:absolute;right:2%;top:4%;display:flex;gap:6px;align-items:center;font-size:clamp(.8rem,2.4vw,1.25rem)}
+.hud .tc{position:absolute;left:50%;top:4%;transform:translateX(-50%);font-size:clamp(.7rem,2vw,1rem);background:rgba(0,0,0,.35);padding:2px 10px;white-space:nowrap}
+.hud canvas{width:clamp(16px,3.4vw,28px);height:auto;image-rendering:pixelated}
+.caption{font-size:.9rem;color:var(--muted)}
+.biome-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.btab{all:unset;cursor:pointer;font-family:var(--font-display);padding:5px 12px;background:var(--panel);border:2px solid var(--panel-lo);box-shadow:inset 2px 2px 0 var(--panel-hi)}
+.btab[aria-pressed="true"]{border-color:var(--ok);background:var(--okbg)}
+.btab:focus-visible{outline:3px solid var(--accent2)}
+
+.dec{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:0 24px}
+.dec div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:2px dotted var(--line);font-size:.93rem;min-width:0}
+.dec dt{color:var(--muted);margin:0}
+.dec dd{margin:0;font-weight:700;text-align:right}
+.issues{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.issue{display:flex;flex-direction:column;gap:6px;padding:14px;background:var(--warnbg);border:3px solid var(--warn)}
+.issue b{font-family:var(--font-display);font-weight:600;color:var(--warn)}
+.issue p{font-size:.93rem}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.card{display:flex;flex-direction:column;gap:10px;min-width:0}
+.card .art{background:var(--bg2);border:3px solid var(--panel-lo);padding:10px;display:flex;align-items:flex-end;justify-content:center;gap:18px;min-height:170px;flex-wrap:wrap}
+.card .art figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+.card .art figcaption{font-family:var(--font-display);font-size:.72rem;color:var(--muted)}
+.card .art canvas{width:auto;max-height:190px}
+.tag{display:inline-block;font-family:var(--font-display);font-size:.75rem;padding:1px 8px;border:2px solid currentColor;color:var(--muted);vertical-align:2px}
+
+.worlds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.world{display:flex;flex-direction:column;gap:6px;min-width:0}
+.world canvas{border:3px solid var(--panel-lo)}
+.world b{font-family:var(--font-display);font-weight:600}
+.world span{font-size:.86rem;color:var(--muted)}
+
+.layers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:10px}
+.layer{display:flex;flex-direction:column;gap:4px;min-width:0}
+.layer canvas{border:2px solid var(--panel-lo)}
+.layer span{font-size:.82rem;color:var(--muted)}
+.layer b{font-family:var(--font-display);font-weight:600;font-size:.9rem}
+
+.dialog-scene{position:relative;border:4px solid #1b1206}
+.dbox{position:absolute;left:3%;right:3%;bottom:4%;background:rgba(20,14,8,.88);border:3px solid #f2d79a;box-shadow:inset 0 0 0 2px #6b4a1a;color:#fff;padding:1.2% 2%;font-size:clamp(.62rem,1.9vw,1rem);line-height:1.35;display:flex;flex-direction:column;gap:2px}
+.dbox b{font-family:var(--font-display);color:#ffd36a;font-weight:600}
+.dbox .nx{position:absolute;right:1.5%;bottom:6%;color:#ffd36a;font-family:var(--font-display)}
+
+.hz{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:12px}
+.hzc{display:flex;flex-direction:column;gap:4px;min-width:0}
+.hzc canvas{border:3px solid var(--panel-lo)}
+.hzc b{font-family:var(--font-display);font-weight:600}
+.hzc span{font-size:.82rem;color:var(--muted);line-height:1.3}
+.yes{color:var(--ok);font-weight:700}
+
+.loop{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-family:var(--font-display)}
+.loop .step{padding:8px 12px;background:var(--panel);border:2px solid var(--panel-lo);box-shadow:inset 2px 2px 0 var(--panel-hi)}
+.loop .arr{color:var(--muted)}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+.rule{display:flex;flex-direction:column;gap:2px}
+.rule .big{font-family:var(--font-display);font-size:1.6rem;color:var(--accent)}
+
+.profile{display:flex;flex-direction:column;gap:4px}
+.profile .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:.88rem}
+.profile .meta b{font-family:var(--font-display)}
+.profile .cv{overflow-x:auto}
+.profile canvas{min-width:480px;border:2px solid var(--panel-lo)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.3)}
+
+.shop{display:flex;flex-direction:column;gap:14px}
+.shop-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.wallet{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:1.2rem}
+.wallet canvas{width:22px;image-rendering:pixelated}
+.shelf-label{font-family:var(--font-display);font-size:.9rem;color:var(--muted)}
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;text-align:center;min-width:0}
+.item canvas{height:52px;width:auto;image-rendering:pixelated}
+.item .nm{font-weight:700;font-size:.85rem;line-height:1.2}
+.item .ef{font-size:.75rem;color:var(--muted);line-height:1.25}
+.item .pr{font-family:var(--font-display);color:var(--gold);display:flex;align-items:center;gap:4px}
+.item .pr canvas{height:12px}
+.item.sel{outline:3px solid #fff;outline-offset:-3px}
+
+.phone{max-width:640px;background:#111;border-radius:26px;padding:14px 18px;box-shadow:0 0 0 3px #333,0 8px 0 #000}
+.screen{position:relative;border-radius:10px;overflow:hidden;background:#7ec8ff}
+.ctl{position:absolute;inset:0;pointer-events:none;font-family:var(--font-display)}
+.ctl .btn{position:absolute;display:flex;align-items:center;justify-content:center;color:#fff;font-size:clamp(.55rem,1.8vw,.85rem);
+  background:rgba(60,60,60,.55);border:2px solid rgba(255,255,255,.75);box-shadow:inset 2px 2px 0 rgba(255,255,255,.35),inset -2px -2px 0 rgba(0,0,0,.4);text-shadow:1px 1px 0 #000}
+.ctl .round{border-radius:50%}
+.keys{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.93rem}
+kbd{font-family:var(--font-display);background:var(--panel);border:2px solid var(--panel-lo);box-shadow:inset -2px -2px 0 rgba(0,0,0,.2);padding:0 6px}
+
+.tech{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.tech > div{display:flex;flex-direction:column;gap:4px}
+.tech b{font-family:var(--font-display);font-weight:600}
+.tech p{font-size:.92rem}
+
+form{display:flex;flex-direction:column;gap:28px}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:20px}
+legend{padding:0;margin-bottom:6px}
+.fs-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.fs-title .letter{font-family:var(--font-display);background:var(--accent);color:#fff;padding:0 9px;font-size:1.1rem}
+.q{display:flex;flex-direction:column;gap:10px}
+.q > .ql{font-weight:800;font-size:1.02rem}
+.q > .qh{font-size:.9rem;color:var(--muted);margin-top:-6px;max-width:72ch}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:8px}
+.opt{position:relative;display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:var(--panel);border:3px solid var(--panel-lo);box-shadow:inset 2px 2px 0 var(--panel-hi);cursor:pointer;min-width:0}
+.opt:hover{background:var(--panel-hi)}
+.opt input{margin:3px 0 0;accent-color:var(--ok);flex:none;width:18px;height:18px}
+.opt:has(input:checked){border-color:var(--ok);background:var(--okbg)}
+.opt:has(input:focus-visible){outline:3px solid var(--accent2);outline-offset:2px}
+.opt .ot{display:flex;flex-direction:column;gap:2px;min-width:0}
+.opt .ot b{font-weight:700;line-height:1.3}
+.opt .ot span{font-size:.85rem;color:var(--muted);line-height:1.35}
+.rec{font-family:var(--font-display);font-size:.7rem;color:var(--ok);border:2px solid var(--ok);padding:0 5px;margin-left:4px;white-space:nowrap}
+.tally{position:absolute;top:-9px;right:6px;font-family:var(--font-display);font-size:.7rem;background:var(--accent2);color:#fff;padding:0 6px}
+input[type=text],textarea{font:inherit;color:var(--fg);background:var(--panel-hi);border:3px solid var(--panel-lo);padding:10px 12px;width:100%;max-width:640px}
+textarea{min-height:110px;resize:vertical}
+.savebar{position:sticky;bottom:max(12px,env(safe-area-inset-bottom,0px));z-index:5;margin-top:24px}
+.savebar .panel{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+.mcbtn{font-family:var(--font-display);font-size:1rem;color:#fff;background:#6f6f6f;border:3px solid #1b1b1b;box-shadow:inset 3px 3px 0 #a5a5a5,inset -3px -3px 0 #4a4a4a;padding:10px 18px;cursor:pointer;text-shadow:2px 2px 0 #333}
+.mcbtn:hover{background:#7d86b8;box-shadow:inset 3px 3px 0 #b6bde6,inset -3px -3px 0 #4f5788}
+.mcbtn.primary{background:#3c8527;box-shadow:inset 3px 3px 0 #6fc05a,inset -3px -3px 0 #275a19}
+.mcbtn.primary:hover{background:#4a9a33}
+.status{font-size:.9rem;color:var(--muted)}
+.respondents{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.9rem}
+.who{display:flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;background:var(--panel);border:2px solid var(--panel-lo)}
+.who img{width:22px;height:22px}
+#copybox{width:100%;max-width:none;min-height:160px;font-family:ui-monospace,Consolas,monospace;font-size:.82rem}
+footer{font-size:.9rem;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="stack">
+  <div class="eyebrow">Návrh hry · verze 0.3 · nová grafika a technické řešení</div>
+  <h1>Matěj a Zlatá poušť</h1>
+  <p class="lead">Klidná plošinovka do prohlížeče pro hráče od 7 do 9 let. Ve verzi 0.3 jsou všechny postavy nakreslené znovu a jemněji a pozadí má pět vrstev s detaily. Na konci stránky je krátký dotazník ke grafice.</p>
+  <nav class="toc" aria-label="Obsah">
+    <a href="#ukazka">Ukázka</a><a href="#pozadi">Pozadí</a><a href="#postavy">Postavy</a><a href="#prekazky">Překážky</a><a href="#pribeh">Příběh</a><a href="#hratelnost">Hratelnost</a><a href="#obchod">Obchod</a><a href="#ovladani">Ovládání</a><a href="#technika">Technika</a><a href="#dotaznik">Dotazník</a>
+  </nav>
+</header>
+
+<section class="sec" id="ukazka">
+  <div class="biome-tabs" id="tabs" role="group" aria-label="Kraj v ukázce"></div>
+  <div class="scene">
+    <canvas id="hero" class="pix" width="480" height="270" aria-label="Animovaná ukázka: Matěj běží pouští, přeskakuje nepřátele a sbírá mince"></canvas>
+    <div class="hud">
+      <div class="tl" id="hudHearts"></div>
+      <div class="tc" id="hudLevel">Kraj 1 · Level 3</div>
+      <div class="tr"><canvas id="hudCoin" width="10" height="10"></canvas><span id="hudCount">0</span></div>
+    </div>
+  </div>
+  <p class="caption">Ukázka běží ve skutečném rozlišení hry 480 × 270 pixelů, které se zvětší na celou obrazovku. Přepínačem nahoře se dá podívat do všech pěti krajů.</p>
+</section>
+
+<section class="sec" id="pozadi">
+  <div class="sec-head"><div class="eyebrow">Grafika pozadí</div><h2>Pět vrstev, každá jede jinou rychlostí</h2>
+    <p>Když Matěj běží, vzdálené stolové hory se posouvají pomalu a blízké duny rychle. Tím vzniká dojem hloubky. Každá vrstva má vlastní detaily: vlnky ve vátém písku, schody pyramid, kameny, lebky a kaktusy.</p></div>
+  <div class="layers" id="layers"></div>
+</section>
+
+<section class="sec" id="postavy">
+  <div class="sec-head"><div class="eyebrow">Postavy</div><h2>Nakreslené znovu, pixel po pixelu</h2>
+    <p>Verze 0.2 vznikla zvětšením kostičkových postav. Ve verzi 0.3 má každá postava vlastní detailní kresbu: oči s lesky, záhyby trička, stín pod kšiltem, čtyři fáze chůze a fázi skoku.</p></div>
+  <div class="grid2">
+    <div class="card panel">
+      <div class="art">
+        <figure><canvas id="cHeroOld" class="pix"></canvas><figcaption>v0.2</figcaption></figure>
+        <figure><canvas id="cHeroFront" class="pix"></canvas><figcaption>v0.3 zepředu</figcaption></figure>
+        <figure><canvas id="cHeroWalk" class="pix"></canvas><figcaption>chůze a skok</figcaption></figure>
+      </div>
+      <h3>Matěj</h3>
+      <p>Červená kšiltovka s knoflíkem, modré tričko se žlutým sluníčkem, kraťasy, hnědé tenisky. Velká hlava zůstala, aby byl Matěj čitelný i na malém displeji.</p>
+    </div>
+    <div class="card panel">
+      <div class="art"><figure><canvas id="cMummy" class="pix"></canvas><figcaption>strážce brány</figcaption></figure></div>
+      <h3>Ramzes, mumie</h3>
+      <p>Obvazy v šikmých pruzích, volný konec visí z ruky, svítící oči a modrozlatý límec faraona. Mrzutý, ale ne zlý.</p>
+    </div>
+    <div class="card panel">
+      <div class="art"><figure><canvas id="cCamel" class="pix"></canvas><figcaption>obchodník</figcaption></figure></div>
+      <h3>Velbloud Bedřich</h3>
+      <p>Červený fez se střapcem a pestrá deka se zlatými třásněmi. Stojí u karavany na začátku a na konci každého kraje.</p>
+    </div>
+    <div class="card panel">
+      <div class="art"><canvas id="cScorp" class="pix"></canvas><canvas id="cPlant" class="pix"></canvas><canvas id="cPlant2" class="pix"></canvas></div>
+      <h3>Štír a masožravá rostlina</h3>
+      <p>Štír má článkované tělo a ocas se žihadlem a dá se porazit skokem na hlavu. Rostlina střídá otevřenou a zavřenou tlamu a musí se přeskočit.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="prekazky">
+  <div class="sec-head"><div class="eyebrow">Nepřátelé a nástrahy</div><h2>Co přibývá kraj po kraji</h2></div>
+  <div class="hz" id="hazards"></div>
+</section>
+
+<section class="sec" id="pribeh">
+  <div class="sec-head"><div class="eyebrow">Příběh, potvrzený</div><h2>Cesta zpátky na pískoviště</h2></div>
+  <div class="panel stack">
+    <p><b>Úvod.</b> Matěj staví na pískovišti hrad a lopatka narazí na zlatý kámen se znakem slunce. Písek se zavíří, Matěj se propadne do Zlaté pouště a díra nad ním se zavře.</p>
+    <p><b>Bedřich.</b> Velbloud Bedřich mu poradí, že domů vede jen Sluneční brána v Chrámu Slunce. Jede s karavanou stejným směrem a v každém kraji na Matěje počká.</p>
+    <p><b>Mumie.</b> Matěj při pádu probudil mumii Ramzese, strážce brány. Ten je mrzutý, na konci každého kraje se ozve v dialogu a pošle do cesty nové nástrahy.</p>
+    <p><b>Konec.</b> U brány Ramzes uzná Matějovu odvahu a bránu sám otevře. Matěj se vynoří z pískoviště a máma volá k večeři. V kapse mu zůstala jedna zlatá mince.</p>
+  </div>
+  <div class="dialog-scene">
+    <canvas id="dialogCv" class="pix" width="480" height="270" aria-label="Ukázka dialogu: Matěj stojí v chrámu před mumií Ramzesem a Sluneční bránou"></canvas>
+    <div class="dbox"><b>RAMZES</b><span>Tři tisíce let tu hlídám bránu. A ty jsi přešel celou poušť… Tak tedy jdi domů, chlapče.</span><span class="nx">▼</span></div>
+  </div>
+  <h3>Pět krajů, 25 levelů</h3>
+  <div class="worlds" id="worlds"></div>
+</section>
+
+<section class="sec" id="hratelnost">
+  <div class="sec-head"><div class="eyebrow">Hratelnost</div><h2>Stejná délka, víc nástrah</h2></div>
+  <div class="loop" aria-label="Herní smyčka">
+    <span class="step">Vyber level na mapě</span><span class="arr">→</span>
+    <span class="step">Běž, skákej, sbírej mince</span><span class="arr">→</span>
+    <span class="step">Checkpoint v půlce</span><span class="arr">→</span>
+    <span class="step">Obelisk v cíli</span><span class="arr">→</span>
+    <span class="step">Nakup u Bedřicha</span>
+  </div>
+  <div class="rules">
+    <div class="rule panel"><span class="big">3</span><b>životy, vždy přesně tři</b><span class="muted">Když Matěj přijde o všechny, vrátí se na checkpoint s plnými srdíčky.</span></div>
+    <div class="rule panel"><span class="big">120</span><b>bloků každá trať</b><span class="muted">Zhruba 2 až 3 minuty hraní. Všech 25 levelů je stejně dlouhých.</span></div>
+    <div class="rule panel"><span class="big">∞</span><b>bez časového limitu</b><span class="muted">Žádný odpočet, žádné hvězdy. Klidné tempo.</span></div>
+    <div class="rule panel"><span class="big">?</span><b>tajné místnosti a odznaky</b><span class="muted">Skryté cesty s mincemi navíc a odznaky za úspěchy.</span></div>
+  </div>
+  <div class="panel stack">
+    <h3>Jak roste obtížnost při stejné délce</h3>
+    <div id="profiles" class="stack"></div>
+    <div class="legend">
+      <span><i style="background:#e8c872"></i>písek</span><span><i style="background:#b9894a"></i>plošina</span>
+      <span><i style="background:#d33"></i>štír, had, sup</span><span><i style="background:#3a3"></i>rostlina, kaktus</span><span><i style="background:#ffd21a"></i>mince</span><span><i style="background:#f2c230;outline:2px solid #555"></i>checkpoint</span>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="obchod">
+  <div class="sec-head"><div class="eyebrow">Obchod velblouda Bedřicha</div><h2>Na co se šetří</h2></div>
+  <div class="panel shop">
+    <div class="shop-top"><h3>Bedřichova karavana</h3><div class="wallet"><canvas id="wCoin" width="10" height="10"></canvas><span>243</span></div></div>
+    <div class="shelf-label">Jednorázové: platí na jeden level</div>
+    <div class="shelf" id="shelf1"></div>
+    <div class="shelf-label">Trvalé: vyšší skok ve třech úrovních</div>
+    <div class="shelf" id="shelf2"></div>
+    <div class="shelf-label">Oblečky: čepice a trička</div>
+    <div class="shelf" id="shelf3"></div>
+  </div>
+</section>
+
+<section class="sec" id="ovladani">
+  <div class="sec-head"><div class="eyebrow">Ovládání</div><h2>Klávesnice a dotyk na šířku</h2></div>
+  <div class="keys"><span><kbd>←</kbd> <kbd>→</kbd> běh</span><span><kbd>↑</kbd> / <kbd>mezerník</kbd> skok</span><span><kbd>Shift</kbd> raketový batoh</span><span><kbd>Esc</kbd> pauza</span></div>
+  <div class="phone">
+    <div class="screen">
+      <canvas id="phoneCv" class="pix" width="480" height="270"></canvas>
+      <div class="hud">
+        <div class="tl" id="hudHearts2"></div>
+        <div class="tr"><canvas id="hudCoin2" width="10" height="10"></canvas><span>37</span></div>
+      </div>
+      <div class="ctl">
+        <div class="btn" style="left:44%;top:4%;width:9%;height:13%">II</div>
+        <div class="btn" style="left:3%;bottom:6%;width:12%;height:22%">◀</div>
+        <div class="btn" style="left:17%;bottom:6%;width:12%;height:22%">▶</div>
+        <div class="btn round" style="right:4%;bottom:6%;width:14%;height:25%">SKOK</div>
+        <div class="btn round" style="right:20%;bottom:9%;width:10%;height:18%">BATOH</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="technika">
+  <div class="sec-head"><div class="eyebrow">Technické řešení</div><h2>Co jste zvolili a jak to poskládám</h2></div>
+  <div class="tech">
+    <div class="panel"><b>Phaser 3 + TypeScript</b><p>Herní knihovna se postará o fyziku skoku, kameru, dotyk a zvuk. TypeScript hlídá chyby už při psaní.</p></div>
+    <div class="panel"><b>Vite</b><p>Vývojový server s okamžitým obnovením. Výsledkem je složka statických souborů bez serveru.</p></div>
+    <div class="panel"><b>Levely v Tiled</b><p>Každý level je mapa 120 × 17 dlaždic. Tiled ji uloží jako JSON a hra ji načte. Nepřátele, mince a checkpoint se do mapy vkládají jako objekty.</p></div>
+    <div class="panel"><b>Grafika z kódu</b><p>Generátor, který kreslí obrázky na této stránce, se stane součástí projektu. Jedním příkazem vyrobí PNG sady postav, dlaždic a pozadí.</p></div>
+    <div class="panel"><b>Zvuky jsfxr, hudba BeepBox</b><p>Cinknutí mince, skok a zásah z generátoru zvuků. Klidné 8bitové melodie, jedna pro každý kraj.</p></div>
+    <div class="panel"><b>Instalace a offline</b><p>Hra půjde přidat na plochu jako aplikace a po prvním spuštění poběží i bez internetu. Postup se ukládá v prohlížeči.</p></div>
+  </div>
+  <div class="issues">
+    <div class="panel"><b>Vyřešeno: veřejný repozitář a GitHub Pages</b><p>Na bezplatném GitHubu publikuje Pages jen z veřejného repozitáře, proto bude repozitář veřejný. Hra se nasadí automaticky po každé změně.</p></div>
+    <div class="issue"><b>Testovací zařízení</b><p>Nevyplnili jste je, takže budu cílit na Chrome, Edge, Safari a Firefox posledních dvou let. Pokud doma máte starší tablet, napište jaký.</p></div>
+  </div>
+  <div class="panel stack">
+    <b>První prototyp, jeden level</b>
+    <p>Běh a skok s jemnou fyzikou, kamera, level z Tiled, mince, štír a rostlina, tři srdce, checkpoint, cíl, tlačítka pro mobil a ovládání klávesnicí. Grafika ve stylu verze 0.3, zatím bez obchodu, příběhu a zvuků.</p>
+  </div>
+</section>
+
+<section class="sec" id="dotaznik">
+  <div class="sec-head"><div class="eyebrow">Dotazník 3</div><h2>Sedí nová grafika?</h2>
+    <p>Tři otázky ke grafice a místo pro poznámky. Mezitím můžu začít stavět prototyp, grafiku do něj doladím podle vašich odpovědí.</p></div>
+  <div class="respondents" id="respondents"><span class="muted">Načítám, kdo už odpověděl…</span></div>
+  <form id="form" novalidate></form>
+  <div class="panel stack" id="copyPanel" hidden>
+    <b>Odpovědi jako text</b>
+    <p class="muted">Pokud ukládání nefunguje, zkopírujte tento text a vložte ho do chatu.</p>
+    <textarea id="copybox" readonly aria-label="Odpovědi jako text"></textarea>
+  </div>
+</section>
+
+<footer>Další krok: založení projektu a hratelný prototyp jednoho levelu.</footer>
+</div>
+
+<div class="savebar wrap">
+  <div class="panel">
+    <span class="status" id="status">Odpovědi zatím nejsou uložené.</span>
+    <div class="btns">
+      <button class="mcbtn" type="button" id="copyBtn">Kopírovat jako text</button>
+      <button class="mcbtn primary" type="button" id="saveBtn">Uložit odpovědi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= core pixel toolkit ================= */
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function cv(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function rgb(h){const n=parseInt(h.slice(1),16);return[n>>16,n>>8&255,n&255]}
+function hex(a){return'#'+((1<<24)|(clamp(a[0])<<16)|(clamp(a[1])<<8)|clamp(a[2])).toString(16).slice(1)}
+function clamp(v){return Math.max(0,Math.min(255,Math.round(v)))}
+function lerp(a,b,f){return[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f]}
+function mul(a,f){return[a[0]*f,a[1]*f,a[2]*f]}
+function shade(h,f){return hex(mul(rgb(h),f))}
+const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+function dith(i,j,f){return f*16>BAYER[(i&3)+((j&3)<<2)]+0.5}
+function buf(w,h){const c=cv(w,h),x=c.getContext('2d'),im=x.createImageData(w,h),d=im.data;
+  return{w,h,set(i,j,col,a){i|=0;j|=0;if(i<0||j<0||i>=w||j>=h)return;const k=(j*w+i)*4;d[k]=clamp(col[0]);d[k+1]=clamp(col[1]);d[k+2]=clamp(col[2]);d[k+3]=a==null?255:a},
+    done(){x.putImageData(im,0,0);return c}}}
+/* selective outline: transparent pixels next to the shape take a dark tone of their neighbour */
+function outline(c){const w=c.width,h=c.height,x=c.getContext('2d'),im=x.getImageData(0,0,w,h),d=im.data,o=new Uint8ClampedArray(d);
+  const A=(i,j)=>(i<0||j<0||i>=w||j>=h)?0:d[(j*w+i)*4+3];
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){const k=(j*w+i)*4;if(d[k+3])continue;
+    for(const [dx,dy] of [[0,1],[1,0],[-1,0],[0,-1]]){if(A(i+dx,j+dy)){const n=((j+dy)*w+i+dx)*4;o[k]=d[n]*0.32;o[k+1]=d[n+1]*0.26;o[k+2]=d[n+2]*0.3;o[k+3]=255;break}}}
+  im.data.set(o);x.putImageData(im,0,0);return c}
+/* drawing API for hand-placed sprites */
+function art(w,h,fn,noOutline){const c=cv(w,h),x=c.getContext('2d');
+  const P={x,
+    r(a,b,ww,hh,col){x.fillStyle=col;x.fillRect(Math.round(a),Math.round(b),ww,hh)},
+    p(a,b,col){x.fillStyle=col;x.fillRect(Math.round(a),Math.round(b),1,1)},
+    rr(a,b,ww,hh,col){x.fillStyle=col;x.fillRect(a+1,b,ww-2,hh);x.fillRect(a,b+1,ww,hh-2)},
+    el(cx,cy,rx,ry,col){x.fillStyle=col;for(let j=Math.floor(-ry);j<=Math.ceil(ry);j++)for(let i=Math.floor(-rx);i<=Math.ceil(rx);i++){if((i*i)/(rx*rx)+(j*j)/(ry*ry)<=1.02)x.fillRect(Math.round(cx+i),Math.round(cy+j),1,1)}},
+    ln(x0,y0,x1,y1,col){x.fillStyle=col;x0=Math.round(x0);y0=Math.round(y0);x1=Math.round(x1);y1=Math.round(y1);let dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,e=dx+dy;for(let n=0;n<400;n++){x.fillRect(x0,y0,1,1);if(x0===x1&&y0===y1)break;const e2=2*e;if(e2>=dy){e+=dy;x0+=sx}if(e2<=dx){e+=dx;y0+=sy}}},
+    clr(a,b,ww,hh){x.clearRect(a,b,ww||1,hh||1)}};
+  fn(P);return noOutline?c:outline(c)}
+
+/* ================= characters v0.3 ================= */
+const MP={cap:'#d8382a',capHi:'#ff7058',capSh:'#9c1f17',brim:'#b2261c',brimSh:'#6e140e',btn:'#ff9a80',skin:'#f6c9a2',skinSh:'#dca07a',skinHi:'#ffe2c8',hair:'#6b4423',hairSh:'#45290f',eye:'#1e2a4a',white:'#ffffff',mouth:'#a5523f',blush:'#f2a090',
+  shirt:'#3b7be8',shirtSh:'#2655b8',shirtHi:'#78a8f6',logo:'#ffd21a',shorts:'#3f4260',shortsSh:'#2a2c42',shoe:'#7b4b26',shoeSh:'#4e2f16',sole:'#f2ebdc'};
+function matejSide(pal,ph){// ph 0..3 walk, 4 = jump; faces right; 24x36
+  return art(24,36,P=>{const sw=ph===4?0:[0,2,0,-2][ph],bob=(ph===1||ph===3)?1:0,y0=1-bob+ (ph===4?0:0);
+    const Y=v=>v+ (bob?-1:0)+1;
+    // back leg
+    if(ph===4){P.r(8,Y(26),3,3,pal.skinSh);P.r(6,Y(28),5,2,pal.shoeSh);P.r(6,Y(30),5,1,shade(pal.sole,.8))}
+    else{P.r(9-sw,Y(27),3,4,pal.skinSh);P.r(8-sw,Y(31),5,2,pal.shoeSh);P.r(8-sw,Y(33),5,1,shade(pal.sole,.8))}
+    // shorts
+    P.rr(8,Y(22),9,6,pal.shorts);P.r(8,Y(26),9,1,pal.shortsSh);P.r(9,Y(23),1,3,pal.shortsSh);
+    // front leg
+    if(ph===4){P.r(13,Y(26),3,3,pal.skin);P.r(13,Y(28),5,2,pal.shoe);P.r(13,Y(30),5,1,pal.sole);P.p(17,Y(28),shade(pal.shoe,1.25))}
+    else{P.r(12+sw,Y(27),3,4,pal.skin);P.p(14+sw,Y(27),pal.skinSh);P.r(12+sw,Y(31),5,2,pal.shoe);P.p(16+sw,Y(31),shade(pal.shoe,1.3));P.r(12+sw,Y(33),5,1,pal.sole)}
+    // torso
+    P.rr(7,Y(13),11,10,pal.shirt);P.r(7,Y(14),2,8,pal.shirtSh);P.r(16,Y(14),1,7,pal.shirtHi);P.r(9,Y(21),8,1,pal.shirtSh);
+    P.r(13,Y(16),2,2,pal.logo);P.p(12,Y(16),shade(pal.logo,.8));P.p(15,Y(17),shade(pal.logo,.8));
+    // neck
+    P.r(10,Y(11),4,2,pal.skinSh);
+    // head
+    P.rr(6,Y(2),11,10,pal.skin);P.r(17,Y(7),1,2,pal.skin);P.p(17,Y(9),pal.skinSh);
+    P.r(6,Y(4),1,6,pal.skinSh);P.r(8,Y(11),8,1,pal.skinSh);P.r(15,Y(5),1,4,pal.skinHi);
+    P.r(6,Y(3),4,6,pal.hair);P.r(6,Y(9),2,2,pal.hair);P.r(6,Y(6),1,4,pal.hairSh);P.p(10,Y(4),pal.hair);
+    P.r(9,Y(6),2,3,pal.skinSh);P.p(10,Y(7),pal.skin);
+    P.r(13,Y(5),3,1,pal.hair);P.r(13,Y(6),3,3,pal.white);P.r(14,Y(6),2,3,pal.eye);P.p(15,Y(6),pal.white);
+    P.r(12,Y(9),2,1,pal.blush);P.r(15,Y(10),2,1,pal.mouth);P.p(14,Y(10),shade(pal.mouth,1.2));
+    // cap
+    P.rr(6,Y(-1),11,5,pal.cap);P.r(9,Y(-1),5,1,pal.capHi);P.r(8,Y(0),3,1,pal.capHi);P.r(6,Y(1),2,3,pal.capSh);P.r(6,Y(3),11,1,pal.capSh);P.p(11,Y(-1),pal.btn);
+    P.r(14,Y(3),7,2,pal.brim);P.r(15,Y(4),6,1,pal.brimSh);P.r(13,Y(5),4,1,pal.skinSh);
+    // front arm
+    if(ph===4){P.r(10,Y(13),4,3,pal.shirt);P.r(13,Y(8),3,5,pal.skin);P.r(13,Y(6),3,2,pal.skin);P.p(15,Y(6),pal.skinSh)}
+    else{const ao=-Math.round(sw*0.75);P.r(10,Y(13),4,4,pal.shirt);P.r(10,Y(13),1,4,pal.shirtSh);P.r(10+ao,Y(17),3,4,pal.skin);P.r(10+ao,Y(17),1,4,pal.skinSh);P.r(10+ao,Y(21),3,2,pal.skin);P.p(12+ao,Y(22),pal.skinSh)}
+  })}
+function matejFront(pal){return art(26,36,P=>{
+  P.r(8,28,3,4,pal.skinSh);P.r(15,28,3,4,pal.skin);P.r(7,32,5,2,pal.shoeSh);P.r(14,32,5,2,pal.shoe);P.r(7,34,5,1,shade(pal.sole,.8));P.r(14,34,5,1,pal.sole);
+  P.rr(7,23,12,6,pal.shorts);P.r(12,27,2,2,pal.shortsSh);P.r(7,27,12,1,pal.shortsSh);P.x.clearRect(12,28,2,1);
+  P.rr(6,14,14,10,pal.shirt);P.r(6,15,2,8,pal.shirtSh);P.r(18,15,1,7,pal.shirtHi);P.r(8,22,10,1,pal.shirtSh);P.r(12,17,2,2,pal.logo);P.p(11,17,shade(pal.logo,.8));P.p(14,18,shade(pal.logo,.8));
+  P.r(3,15,3,4,pal.shirtSh);P.r(20,15,3,4,pal.shirt);P.r(3,19,3,4,pal.skinSh);P.r(20,19,3,4,pal.skin);P.r(3,23,3,2,pal.skinSh);P.r(20,23,3,2,pal.skin);
+  P.r(11,12,4,2,pal.skinSh);
+  P.rr(5,3,16,10,pal.skin);P.r(5,5,1,6,pal.skinSh);P.r(7,12,12,1,pal.skinSh);P.r(19,5,1,4,pal.skinHi);
+  P.r(5,4,2,5,pal.hair);P.r(19,4,2,5,pal.hair);P.r(4,7,1,3,pal.skinSh);P.r(21,7,1,3,pal.skin);
+  P.r(8,6,3,1,pal.hair);P.r(15,6,3,1,pal.hair);P.r(8,7,3,3,pal.white);P.r(15,7,3,3,pal.white);P.r(9,7,2,3,pal.eye);P.r(15,7,2,3,pal.eye);P.p(10,7,pal.white);P.p(16,7,pal.white);
+  P.p(13,9,pal.skinSh);P.r(11,11,4,1,pal.mouth);P.p(10,10,pal.mouth);P.p(15,10,pal.mouth);P.r(7,10,2,1,pal.blush);P.r(17,10,2,1,pal.blush);
+  P.rr(5,0,16,5,pal.cap);P.r(9,0,8,1,pal.capHi);P.r(7,1,3,1,pal.capHi);P.r(5,2,2,3,pal.capSh);P.r(5,4,16,1,pal.capSh);P.p(13,0,pal.btn);
+  P.r(4,5,18,1,pal.brim);P.r(5,6,16,1,pal.brimSh)})}
+function scorpion(ph){return art(36,20,P=>{const B='#c97a22',H='#eaa94a',S='#8e4f12',D='#5a300a',C='#d98a2a';
+  const lg=ph?1:0;for(let i=0;i<4;i++){const lx=15+i*4;P.ln(lx,12,lx-2+((i+lg)%2?1:-1),17,D);P.p(lx-2+((i+lg)%2?1:-1),18,D)}
+  [[30,10,3],[32,7,2.6],[33,4,2.3],[31,2,2],[28,1,1.8]].forEach(([x,y,r],i)=>{P.el(x,y,r,r,B);P.p(x-1,y-1,H)});
+  P.p(26,2,D);P.p(25,3,D);P.p(24,4,D);
+  P.el(21,11,8,3.6,B);P.r(15,8,11,1,H);P.r(14,14,14,1,S);[17,20,23,26].forEach(x=>P.r(x,9,1,4,S));
+  P.el(11,11,4,3,B);P.p(9,10,'#111');P.p(11,9,'#111');P.p(10,9,H);
+  P.ln(9,12,5,13,B);P.el(4,12,3.4,2.4,C);P.p(1,12,'#00000000');P.x.clearRect(1,12,2,1);P.p(4,11,H);
+  P.el(6,15,2.6,1.6,S)})}
+function plant(open){return art(28,34,P=>{const G='#47a332',Gh='#7ccf52',Gs='#2f7a22',Y='#e3e85a',R='#c0262d',K='#6e0f14',W='#ffffff',St='#3d7d2a',L='#58b23e',Ls='#3a8a2a';
+  P.r(13,18,2,15,St);P.p(14,22,Gs);P.p(13,27,Gs);
+  P.el(8,26,5,2,L);P.ln(4,26,11,26,Ls);P.el(19,23,5,2,L);P.ln(16,23,23,23,Ls);P.el(9,31,4,1.6,L);P.el(18,30,4,1.6,L);
+  if(open){P.el(14,12,10,6,R);P.el(14,13,7,3.5,K);P.el(14,6,11,5,G);P.r(4,7,21,1,Gs);P.r(8,3,10,1,Gh);P.r(6,4,3,1,Gh);
+    for(let i=5;i<24;i+=3){P.r(i,8,1,2,W)}P.el(14,18,10,3.5,G);P.r(6,20,17,1,Gs);for(let i=6;i<23;i+=3){P.r(i,15,1,2,W)}
+    [[9,4],[18,5],[13,2],[21,7]].forEach(([a,b])=>P.p(a,b,Y))}
+  else{P.el(14,11,11,7,G);P.r(8,5,10,1,Gh);P.r(6,6,3,1,Gh);P.r(4,15,20,1,Gs);P.r(3,11,23,1,K);for(let i=4;i<25;i+=2)P.p(i,i%4?10:12,W);
+    [[9,7],[18,8],[13,5],[21,13],[7,14]].forEach(([a,b])=>P.p(a,b,Y))}})}
+function mummy(){const c=art(30,44,P=>{const W='#e9e1c9',S='#c4b896',Hi='#fbf6e8',Gd='#f2c230',Bl='#2a5cc0',E='#ffd21a',Ec='#fff7b0',K='#4a4232';
+  P.r(17,32,5,10,S);P.r(16,41,6,2,S);
+  P.r(11,32,5,10,W);P.r(10,41,6,2,W);
+  P.rr(10,16,13,17,W);P.r(20,17,2,14,S);
+  P.r(4,23,9,3,S);P.r(3,23,2,3,shade('#c4b896',.85));
+  P.rr(9,3,13,13,W);P.r(19,4,2,10,S);P.r(11,3,7,1,Hi);
+  P.r(10,8,4,3,K);P.r(15,8,4,3,K);P.r(11,9,2,1,E);P.r(16,9,2,1,E);P.p(11,9,Ec);P.p(16,9,Ec);
+  P.r(12,13,5,1,K);
+  P.r(9,16,14,3,Gd);for(let i=10;i<23;i+=3){P.r(i,17,1,2,Bl)}P.r(9,18,14,1,shade('#f2c230',.8));
+  P.r(1,19,12,4,W);P.r(0,19,2,4,W);P.r(1,22,12,1,S);
+  P.r(5,23,1,5,S);P.p(6,28,S);P.p(5,28,W);
+  const x=P.x,im=x.getImageData(0,0,30,44),d=im.data;
+  for(let j=0;j<44;j++)for(let i=0;i<30;i++){const k=(j*30+i)*4;if(!d[k+3])continue;const isGold=d[k]>230&&d[k+1]>180&&d[k+2]<80;const isEye=d[k+2]<80&&d[k]>240;if(isGold||isEye||d[k]<120)continue;
+    const m=(j+Math.floor(i/3))%4;if(m===0){d[k]*=.84;d[k+1]*=.84;d[k+2]*=.82}else if(m===1){d[k]=Math.min(255,d[k]*1.04);d[k+1]=Math.min(255,d[k+1]*1.04);d[k+2]=Math.min(255,d[k+2]*1.04)}}
+  x.putImageData(im,0,0)},true);return outline(c)}
+function camel(){return art(46,38,P=>{const B='#c8955a',S='#9e6f3c',H='#e2b57c',D='#6e4a22',R='#b8322a',Rs='#86201a',Gd='#f2c230',F='#c0262d';
+  [[13,26],[33,26]].forEach(([x,y])=>{P.r(x,y,3,10,S);P.r(x-1,y+10,5,1,D)});
+  [[17,26],[37,26]].forEach(([x,y])=>{P.r(x,y,3,10,B);P.p(x,y+5,S);P.r(x-1,y+10,5,1,D)});
+  P.el(27,21,14,7,B);P.r(16,27,22,1,S);P.r(17,15,18,1,H);
+  P.el(27,13,7,6,B);P.r(23,8,8,1,H);
+  P.rr(20,13,15,9,R);P.r(20,20,15,1,Gd);for(let i=21;i<35;i+=3){P.p(i,16,Gd);P.p(i+1,17,Gd);P.p(i,21,Gd);P.p(i,22,Gd)}P.r(20,14,1,6,Rs);
+  for(let y=7;y<20;y++){const x0=Math.round(6+(y-7)*0.62);P.r(x0,y,5,1,B);P.p(x0,y,S)}
+  P.el(6,6,5,3.4,B);P.r(1,6,4,3,B);P.p(2,6,D);P.r(1,8,4,1,S);P.r(4,3,4,1,H);
+  P.p(6,5,'#222');P.p(7,4,'#222');P.p(9,3,S);
+  P.r(4,0,5,3,F);P.r(5,0,3,1,shade('#c0262d',1.25));P.p(9,1,'#222');P.p(10,2,'#222');P.p(10,3,Gd);
+  P.ln(41,18,43,25,S);P.p(43,26,D)})}
+function vulture(ph){return art(34,20,P=>{const W='#5a3b22',S='#3e2714',T='#2e1d0f',H='#7d5636',N='#e7a08a',Bk='#e8b23a';const up=ph?-2:0;
+  P.el(10,9+up/2,9,3,W);P.el(24,9+up/2,9,3,W);P.r(4,7+up/2,8,1,H);P.r(20,7+up/2,8,1,H);
+  for(let i=0;i<5;i++){P.ln(2+i*2,10+up/2,1+i*2,13+up/2,T);P.ln(24+i*2,10+up/2,25+i*2,13+up/2,T)}
+  P.el(17,10,5,3,S);P.r(21,10,5,3,S);P.el(13,7,3,2,'#eeeeee');
+  P.r(10,4,2,3,N);P.el(9,3,2.5,2,N);P.r(5,3,3,1,Bk);P.p(5,4,Bk);P.p(9,2,'#111')})}
+function snake(){return art(32,16,P=>{const B='#a3ad44',S='#6b7428',D='#4e5520',Be='#d9d39a',Rt='#d8c08a';
+  for(let x=5;x<27;x++){const y=Math.round(10+2.3*Math.sin(x*0.45));P.r(x,y-1,1,3,B);P.p(x,y+1,Be);if(x%4===0){P.p(x,y-1,D);P.p(x+1,y,D)}}
+  P.r(3,5,3,6,B);P.p(3,8,D);P.el(4,4,3,2,B);P.p(3,3,'#111');P.p(5,3,shade('#a3ad44',1.2));P.p(0,5,'#d22');P.p(1,5,'#d22');P.p(0,6,'#d22');
+  const ye=Math.round(10+2.3*Math.sin(27*0.45));P.r(27,ye-1,2,2,Rt);P.r(29,ye-2,2,2,Rt);P.p(28,ye-1,shade('#d8c08a',.75));P.p(30,ye-2,shade('#d8c08a',.75))})}
+function saguaro(h,col){col=col||'#4c9a3c';const S=shade(col,.72),H=shade(col,1.2);return art(16,h,P=>{
+  P.rr(5,0,6,h,col);for(let y=1;y<h-1;y+=1){P.p(6,y,S);P.p(9,y,H)}
+  const a=Math.round(h*0.45);P.r(1,a,5,3,col);P.rr(1,a-8,3,10,col);P.p(2,a-6,H);
+  const b=Math.round(h*0.3);P.r(10,b,4,3,col);P.rr(12,b-6,3,9,col);P.p(13,b-4,H);
+  for(let y=3;y<h;y+=5)P.p(7,y,'#f3f0c0')})}
+function palm(h){return art(36,h,P=>{const Tr='#8a5a2b',Ts='#5e3c1c',F='#3f9b2f',Fs='#2b6f20';
+  for(let y=10;y<h;y++){const x=Math.round(17+Math.sin((y/h)*2.2)*3);P.r(x,y,3,1,Tr);if(y%3===0)P.r(x,y,3,1,Ts)}
+  [[-1,-.2],[1,-.25],[-1,.35],[1,.4],[0,-.6]].forEach(([dir,c])=>{for(let i=0;i<16;i++){const x=18+dir*i,y=10+Math.round(c*i+0.04*i*i);P.r(x,y,2,1,F);if(i%3===0)P.p(x,y+1,Fs)}});
+  P.el(18,10,3,2,F);P.p(16,12,'#7a4a1e');P.p(20,12,'#7a4a1e')})}
+function rock(w,h,col){return art(w+2,h+2,P=>{P.el(w/2+1,h/2+1,w/2,h/2,col);P.el(w/2,h/2,w/4,h/4,shade(col,1.15));P.r(2,h,w-2,1,shade(col,.75))})}
+function skull(){return art(12,8,P=>{const W='#efe6d2',S='#bfb39a';P.el(6,4,3.5,2.6,W);P.r(4,6,5,1,W);P.p(5,4,'#3a2e20');P.p(7,4,'#3a2e20');P.ln(2,3,0,1,W);P.ln(10,3,11,1,W);P.p(6,6,S)})}
+function bush(){return art(14,10,P=>{const B='#8a6a3a',S='#5e4724';for(let i=0;i<6;i++){P.ln(7,9,1+i*2.4,2+(i%2)*2,i%2?B:S)}})}
+function pillar(h){return art(14,h,P=>{const C='#e8d3a0',S='#b99c62',H='#fff1c8';P.r(2,4,10,h-6,C);for(let x=3;x<12;x+=3)P.r(x,5,1,h-8,S);P.r(1,h-3,12,3,S);P.r(0,2,14,3,C);P.r(0,2,14,1,H);P.x.clearRect(8,0,6,3);P.p(8,2,S);P.p(10,3,S)})}
+
+/* ================= tiles ================= */
+const TILEC={};
+function tileSet(b){if(TILEC[b])return TILEC[b];const B=BIOMES[b];const sand=rgb(B.sand),stone=rgb(B.stone);
+  const top=[0,1,2].map(v=>{const t=buf(16,16),R=rng(10+v);for(let j=0;j<16;j++)for(let i=0;i<16;i++){let f=0.95+R()*0.1;
+      if(j===0)f*=1.16;else if(j===1)f*=1.08;if(j>=4&&((j+Math.round(1.6*Math.sin((i+v*5)/2.6)))%5===0))f*=0.9;if(j>=4&&((j+Math.round(1.6*Math.sin((i+v*5)/2.6)))%5===1))f*=1.05;if(j===15)f*=0.92;
+      t.set(i,j,mul(sand,f))}
+    if(v>0){const px=3+v*5,py=7+v;[[0,0],[1,0],[0,1],[1,1]].forEach(([a,c])=>t.set(px+a,py+c,mul(stone,c?0.7:0.85)));t.set(px,py,mul(stone,1.1))}
+    if(B.grass&&v===1){[[3,0],[4,-1],[5,0],[11,0],[12,-1]].forEach(([a,c])=>{})}
+    return t.done()});
+  const st=[0,1,2,3].map(v=>{const t=buf(16,16),R=rng(30+v);const band=[1,0.92,1.05,0.88,0.98];for(let j=0;j<16;j++)for(let i=0;i<16;i++){let f=(0.95+R()*0.1)*band[Math.floor((j+v*2)/4)%5];
+      if(i===15||j===15)f*=0.9;if(i===0||j===0)f*=1.05;
+      if(v===2&&((i===5&&j>2&&j<9)||(j===8&&i>4&&i<11)||(i===10&&j>7&&j<14)))f*=0.62;
+      t.set(i,j,mul(stone,f))}
+    if(v===3){[[8,7],[9,7],[10,8],[10,9],[9,10],[8,10],[7,9],[7,8],[8,8],[9,9]].forEach(([a,c],k)=>t.set(a,c,mul(stone,k<8?1.25:0.8)))}
+    return t.done()});
+  const plank=(()=>{const t=buf(16,16),R=rng(5),w=rgb('#b9894a');for(let j=0;j<16;j++)for(let i=0;i<16;i++){let f=0.92+R()*0.12;if(j===0)f*=1.2;if(j===7||j===15)f*=0.65;if((i*3+j*7)%11===0)f*=0.85;if(i===15&&j<7)f*=0.7;if(i===7&&j>7)f*=0.7;t.set(i,j,mul(w,f))}
+    [[2,3],[13,3],[4,11],[11,11]].forEach(([a,c])=>t.set(a,c,[90,80,70]));return t.done()})();
+  TILEC[b]={top,st,plank};return TILEC[b]}
+
+/* ================= biomes & background layers ================= */
+const GW=480,GH=270,GROUND=206,LW=960,T=16;
+const BIOMES={
+ dunes:{name:'Zlaté duny',desc:'Levely 1–5. Štíři, rostliny, kaktusy.',sky:['#3f8fe0','#6fb3f0','#a8d6f7','#d9eefa','#f7ecd2'],sun:true,mesa:'#d9a46a',pyr:'#e0b878',far:['#f3d596','#d4ab68'],near:['#f2c873','#cf9a4c'],sand:'#e8c872',stone:'#cf9f58',decor:'saguaro',cloud:'#ffffff'},
+ canyon:{name:'Rudý kaňon',desc:'Levely 6–10. Propasti, padající bloky, supi.',sky:['#4f86d6','#7aa8e6','#b9c9e6','#f1c9a0','#f6b27a'],sun:true,mesa:'#b5593a',pyr:null,far:['#dd8f60','#a95c38'],near:['#df9455','#a95a30'],sand:'#d98c4f',stone:'#b0603a',decor:'rocks',cloud:'#fff4ea',bigMesa:true},
+ oasis:{name:'Oáza Palmíra',desc:'Levely 11–15. Tekutý písek, chřestýši.',sky:['#2f9bd8','#5cc0e8','#9be0ef','#d4f3ee','#f3f0d0'],sun:true,mesa:'#c9b07a',pyr:null,far:['#a9d47a','#7fb256'],near:['#efd890','#cdaa5e'],sand:'#e9d38a',stone:'#c9a85f',decor:'palm',cloud:'#ffffff',water:true},
+ night:{name:'Noční poušť',desc:'Levely 16–20. Písečná bouře, tma.',sky:['#060a24','#0d1440','#1a2260','#2d3478','#453f80'],sun:false,mesa:'#2a2a50',pyr:'#34345e',far:['#4d4c7c','#33325c'],near:['#7c6d90','#54486c'],sand:'#a89268',stone:'#7d6a48',decor:'saguaroDark',cloud:'#8e93c8'},
+ temple:{name:'Chrám Slunce',desc:'Levely 21–25. Balvany, všechno dohromady, brána.',sky:['#d86a34','#ec9148','#f6b866','#fbd68c','#fde9b8'],sun:true,mesa:'#b57a45',pyr:'#d39a52',far:['#dca55e','#b07a38'],near:['#e2b968','#b98840'],sand:'#e0b866',stone:'#a8783e',decor:'ruins',cloud:'#fff0d8',bigPyr:true}
+};
+const LAYC={};
+function hazeOf(B,col,f){return lerp(rgb(col),rgb(B.sky[4]),f)}
+function skyLayer(B){const t=buf(GW,GROUND),n=B.sky.length,cols=B.sky.map(rgb);const sx=372,sy=52;
+  for(let j=0;j<GROUND;j++){const tt=Math.pow(j/(GROUND-1),0.9)*(n-1),i=Math.min(n-2,Math.floor(tt)),f=tt-i;
+    for(let x=0;x<GW;x++){let c=dith(x,j,f)?cols[i+1]:cols[i];
+      const d=Math.hypot(x-sx,j-sy);
+      if(B.sun){if(d<13)c=d<11?[255,247,206]:[255,236,170];else if(d<24&&dith(x,j,(24-d)/14*0.85))c=lerp(c,[255,240,190],.55);else if(d<40&&dith(x,j,(40-d)/16*0.35))c=lerp(c,[255,240,200],.25)}
+      else{if(d<12){c=[236,236,250];if(Math.hypot(x-sx-5,j-sy+3)<10)c=cols[0];else if((x*7+j*13)%23===0)c=[200,200,225]}else if(d<20&&dith(x,j,(20-d)/8*0.4))c=lerp(c,[180,190,240],.4)}
+      t.set(x,j,c)}}
+  if(!B.sun){const R=rng(3);for(let k=0;k<110;k++){const x=R()*GW|0,y=R()*GROUND*0.75|0;t.set(x,y,R()<.2?[255,255,255]:[190,200,240])}}
+  return t.done()}
+function mesaLayer(B){const t=buf(LW,GROUND);const base=GROUND-34;const col=rgb(B.mesa);const M=B.bigMesa?[[100,190,92],[420,120,70],[650,230,104],[880,120,64]]:[[120,150,52],[420,90,38],[640,200,66],[880,110,46]];const R=rng(8);const jag=[];for(let x=0;x<LW;x++)jag.push(Math.round((R()-0.5)*2));
+  for(let x=0;x<LW;x++){let h=0,side=0;M.forEach(([c,w,hh])=>{const dx=((x-c+LW/2)%LW+LW)%LW-LW/2,a=Math.abs(dx);let v=0;if(a<w/2)v=hh;else if(a<w/2+20)v=hh*(1-(a-w/2)/20);if(v>h){h=v;side=dx>0?1:-1}});
+    if(h<=0)continue;const top=Math.round(base-h+jag[x]*(h<40?1:0));
+    for(let j=top;j<GROUND;j++){let f=1;const d=j-top;if(d===0)f=1.2;else if(d<3)f=1.08;if((d+Math.floor(x/40))%9===0)f*=0.88;if(side>0&&dith(x,j,0.5))f*=0.9;if(x%13===0&&d>4)f*=0.94;
+      t.set(x,j,lerp(mul(col,f),rgb(B.sky[4]),0.42))}}
+  return t.done()}
+function pyramidLayer(B){if(!B.pyr)return null;const t=buf(LW,GROUND);const col=rgb(B.pyr);const P=B.bigPyr?[[230,120],[520,70],[760,54]]:[[300,78],[440,50]];const base=GROUND-22;
+  P.forEach(([c,hh])=>{for(let r=0;r<hh;r++){const y=base-hh+r,half=r+1;for(let x=c-half;x<=c+half;x++){let f=x<c?0.78:1.06;if(r%4===0)f*=0.9;if(r%4===1&&x%8===((r>>2)%2)*4)f*=0.92;if(r===0)f=1.2;
+      t.set(((x%LW)+LW)%LW,y,lerp(mul(col,f),rgb(B.sky[4]),0.28))}}
+    for(let j=base;j<GROUND;j++)for(let x=c-hh;x<=c+hh;x++)t.set(((x%LW)+LW)%LW,j,lerp(col,rgb(B.sky[4]),0.28))});
+  return t.done()}
+function duneH(x,amp,seed){const k=2*Math.PI/LW;return amp*(0.55*Math.sin(x*k*2+seed)+0.3*Math.sin(x*k*5+seed*1.7)+0.15*Math.sin(x*k*11+seed*0.3))}
+function duneLayer(B,which){const near=which==='near';const t=buf(LW,GROUND),lit=rgb(near?B.near[0]:B.far[0]),sh=rgb(near?B.near[1]:B.far[1]);const base=near?GROUND-14:GROUND-34,amp=near?12:16,seed=near?2.1:0.7;
+  const tops=[];for(let x=0;x<LW;x++){const h=duneH(x,amp,seed),slope=duneH(x+2,amp,seed)-duneH(x-2,amp,seed);const top=Math.round(base-h-amp);tops.push(top);
+    const lf=Math.max(0,Math.min(1,0.5-slope*0.45));
+    for(let j=top;j<GROUND;j++){const d=j-top;let c=dith(x,j,lf)?lit:sh;let f=1;if(d===0)f=1.15;else if(d===1)f=1.05;
+      if(d>2&&((d+Math.round(2.5*Math.sin(x/11+seed*3)))%7===0))f*=0.92;if(d>2&&((d+Math.round(2.5*Math.sin(x/11+seed*3)))%7===1))f*=1.04;
+      const c2=near?mul(c,f):lerp(mul(c,f),rgb(B.sky[4]),0.15);t.set(x,j,c2)}}
+  const c=t.done(),x=c.getContext('2d');x.imageSmoothingEnabled=false;
+  const R=rng(near?77:44);const put=(s,px)=>{px=Math.round(px);const top=tops[((px+Math.floor(s.width/2))%LW+LW)%LW];x.drawImage(s,px,top-s.height+3);if(px+s.width>LW)x.drawImage(s,px-LW,top-s.height+3)};
+  if(near){
+    for(let k=0;k<6;k++)put(rock(6+(R()*8|0),4+(R()*3|0),B.stone),R()*LW);
+    for(let k=0;k<3;k++)put(bush(),R()*LW);
+    put(skull(),R()*LW);
+    if(B.decor==='saguaro'||B.decor==='saguaroDark'){const col=B.decor==='saguaro'?'#4c9a3c':'#24304a';for(let k=0;k<4;k++)put(saguaro(30+(R()*18|0),col),80+k*240+R()*60)}
+    if(B.decor==='palm'){for(let k=0;k<5;k++)put(palm(44+(R()*14|0)),40+k*190+R()*40)}
+    if(B.decor==='ruins'){for(let k=0;k<4;k++)put(pillar(26+(R()*22|0)),60+k*230+R()*40)}
+    if(B.decor==='rocks'){for(let k=0;k<5;k++)put(rock(16+(R()*14|0),10+(R()*8|0),B.stone),R()*LW)}
+  }else{
+    if(B.decor==='saguaro'||B.decor==='saguaroDark'){const col=B.decor==='saguaro'?'#6f9a58':'#2a3050';for(let k=0;k<5;k++)put(saguaro(18+(R()*8|0),col),R()*LW)}
+    if(B.decor==='palm'){for(let k=0;k<6;k++)put(palm(30),R()*LW);}
+    if(B.water){x.fillStyle=hex(lerp(rgb('#3aa6d8'),rgb(B.sky[4]),0.2));[[200,60],[640,90]].forEach(([px,w])=>{const top=tops[px];x.fillRect(px,top+2,w,3);x.fillStyle='#bfefff';x.fillRect(px+6,top+2,10,1);x.fillRect(px+30,top+3,6,1);x.fillStyle=hex(lerp(rgb('#3aa6d8'),rgb(B.sky[4]),0.2))})}
+  }
+  return {c,tops}}
+function cloudSprite(B,w,seed){const R=rng(seed);const base=rgb(B.cloud);return art(w,22,P=>{const blobs=[];for(let i=0;i<5;i++)blobs.push([6+R()*(w-12),8+R()*5,4+R()*6]);
+  blobs.forEach(([x,y,r])=>P.el(x,y+3,r,r*0.7,hex(mul(base,0.85))));blobs.forEach(([x,y,r])=>P.el(x,y,r,r*0.7,hex(base)));blobs.forEach(([x,y,r])=>P.el(x-1,y-2,r*0.5,r*0.35,hex(lerp(base,[255,255,255],.6))));P.r(3,15,w-6,1,hex(mul(base,0.78)))},true)}
+function layers(b){if(LAYC[b])return LAYC[b];const B=BIOMES[b];const L={sky:skyLayer(B),mesa:mesaLayer(B),pyr:pyramidLayer(B),far:duneLayer(B,'far').c,near:duneLayer(B,'near').c,
+  clouds:[[40,30,70,1],[230,18,96,2],[400,58,60,3],[620,40,84,4]].map(([x,y,w,s])=>({x,y,s:cloudSprite(B,w,s)}))};LAYC[b]=L;return L}
+function tiled(ctx,img,off){const o=((off%LW)+LW)%LW;ctx.drawImage(img,-o,0);ctx.drawImage(img,LW-o,0)}
+
+/* ================= demo world ================= */
+const L=1600, HX=100;
+const HAZ=[{t:'s',x:340},{t:'p',x:620},{t:'g',x:896,w:48},{t:'s',x:1160},{t:'p',x:1400}];
+const COINS=[];
+HAZ.forEach(h=>{const c=h.t==='g'?h.x+h.w/2:h.x;[-26,0,26].forEach(dx=>COINS.push({x:c+dx,y:GROUND-74+Math.abs(dx)*0.8}))});
+[160,180,200,760,780,800,1260,1280].forEach(x=>COINS.push({x,y:GROUND-14}));
+const PLAT=[{x:704,w:112,y:142}];[716,744,772,800].forEach(x=>COINS.push({x,y:128,deco:true}));
+const CHECK=1030;
+function jumpY(p){let y=0;HAZ.forEach(h=>{const c=h.t==='g'?h.x+h.w/2:h.x;const a=c-64,len=124;const u=(p-a)/len;if(u>0&&u<1)y=Math.max(y,4*60*u*(1-u))});return y}
+function inGap(x){return HAZ.some(h=>h.t==='g'&&x>=h.x&&x<h.x+h.w)}
+function hash(n){n=(n^61)^(n>>>16);n=n+(n<<3);n=n^(n>>>4);n=Math.imul(n,0x27d4eb2d);return(n^(n>>>15))>>>0}
+const SPR={};
+function initSprites(){SPR.walk=[0,1,2,3].map(p=>matejSide(MP,p));SPR.jump=matejSide(MP,4);SPR.scorp=[scorpion(0),scorpion(1)];SPR.plantO=plant(true);SPR.plantC=plant(false);
+  SPR.mummy=mummy();SPR.camel=camel();SPR.vulture=[vulture(0),vulture(1)];SPR.snake=snake();
+  SPR.coin=[0,1,2,3].map(f=>art(10,10,P=>{const w=[8,6,2,6][f],x0=5-w/2;P.rr(Math.round(x0),1,w,8,'#ffd21a');if(w>2){P.r(Math.round(x0)+1,2,1,5,'#fff6b0');P.r(Math.round(x0)+w-1,3,1,5,'#d39a00')}},false));
+  SPR.heart=art(11,10,P=>{P.el(3,3,2.5,2.5,'#e02424');P.el(7,3,2.5,2.5,'#e02424');for(let j=4;j<9;j++)P.r(j-3,j,11-2*(j-3)-1,1,'#e02424');P.p(2,2,'#ffb3b3');P.p(3,2,'#ffb3b3');P.p(2,3,'#ffb3b3')})}
+function drawSand(ctx,t,biome,cam){if(biome==='night'||biome==='dunes'||biome==='canyon'){const R=rng(12);ctx.fillStyle=biome==='night'?'rgba(220,210,255,.5)':'rgba(255,240,200,.7)';
+  for(let i=0;i<40;i++){const x=((R()*GW*2-t*(40+R()*60)-cam*0.2)%GW+GW)%GW,y=R()*GROUND+Math.sin(t*2+i)*3;ctx.fillRect(x|0,y|0,R()<.3?2:1,1)}}}
+function renderScene(ctx,cam,biome,t,opt){opt=opt||{};const Ly=layers(biome),TS=tileSet(biome);ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(Ly.sky,0,0);
+  Ly.clouds.forEach(c=>{const sx=((c.x-cam*0.04-t*4)%(GW+140)+GW+140)%(GW+140)-110;ctx.drawImage(c.s,Math.round(sx),c.y)});
+  if(biome==='night'){ctx.fillStyle='#fff';const R=rng(5);for(let i=0;i<14;i++){const x=R()*GW|0,y=R()*120|0;if(Math.sin(t*3+i*1.7)>0.3)ctx.fillRect(x,y,1,1)}}
+  tiled(ctx,Ly.mesa,cam*0.08);if(Ly.pyr)tiled(ctx,Ly.pyr,cam*0.16);tiled(ctx,Ly.far,cam*0.3);tiled(ctx,Ly.near,cam*0.55);
+  PLAT.forEach(pl=>{for(let k=0;k<2;k++){const sx=Math.round(pl.x+k*L-cam);for(let i=0;i<pl.w;i+=T)ctx.drawImage(TS.plank,sx+i,pl.y)}});
+  const off=((cam%T)+T)%T;
+  for(let sx=-off;sx<GW;sx+=T){const wx=Math.round(cam+sx);const lx=((wx%L)+L)%L;if(inGap(lx))continue;const col=Math.floor(wx/T),hh=hash(col);
+    ctx.drawImage(TS.top[hh%3],Math.round(sx),GROUND);for(let r=1;r<5;r++)ctx.drawImage(TS.st[hash(col*7+r)%4],Math.round(sx),GROUND+r*T)}
+  for(let sx=-off;sx<GW;sx+=T){const lx=((Math.round(cam+sx)%L)+L)%L;if(inGap(lx)){ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(Math.round(sx),GROUND,T,GH-GROUND)}}
+  const heroAbs=cam+HX;const fr=Math.floor(t*8)%4;
+  for(let k=Math.floor(cam/L);k<=Math.floor(cam/L)+1;k++){
+    const fx=Math.round(CHECK+k*L-cam);if(fx>-20&&fx<GW){ctx.fillStyle='#5a4a3a';ctx.fillRect(fx,GROUND-48,2,48);const wv=Math.floor(t*4)%2;ctx.fillStyle='#f2c230';ctx.fillRect(fx+2,GROUND-48+wv,14,9);ctx.fillStyle='#c9952a';ctx.fillRect(fx+2,GROUND-41+wv,14,2);ctx.fillStyle='#fff6b0';ctx.fillRect(fx+3,GROUND-47+wv,5,1)}
+    COINS.forEach(c=>{const wx=c.x+k*L;if(!c.deco&&opt.collect!==false&&wx<heroAbs+8)return;const sx=Math.round(wx-cam);if(sx<-12||sx>GW)return;ctx.drawImage(SPR.coin[fr],sx-5,Math.round(c.y-5+Math.sin(t*3+c.x)*1))});
+    HAZ.forEach(h=>{const sx0=h.x+k*L-cam;if(sx0<-60||sx0>GW+60)return;
+      if(h.t==='s'){const pat=Math.sin(t*1.6+h.x)*14,dir=Math.cos(t*1.6+h.x)>0;const s=SPR.scorp[Math.floor(t*6)%2];const sx=Math.round(sx0-18+pat);
+        if(dir){ctx.save();ctx.translate(sx+s.width,0);ctx.scale(-1,1);ctx.drawImage(s,0,GROUND-s.height+1);ctx.restore()}else ctx.drawImage(s,sx,GROUND-s.height+1)}
+      if(h.t==='p'){const s=Math.floor(t*1.2+h.x)%2===0?SPR.plantO:SPR.plantC;ctx.drawImage(s,Math.round(sx0-s.width/2),GROUND-s.height+1)}});
+  }
+  if(opt.hero!==false){const jy=jumpY(((heroAbs%L)+L)%L);const s=jy>2?SPR.jump:SPR.walk[Math.floor(heroAbs/9)%4];ctx.drawImage(s,HX-12,Math.round(GROUND-s.height+1-jy))}
+  drawSand(ctx,t,biome,cam);
+}
+
+/* ================= hazards gallery ================= */
+const HZ=[['scorp','Štír','Kraj 1+',true,'dunes'],['plant','Masožravá rostlina','Kraj 1+',false,'dunes'],['cactus','Pichlavý kaktus','Kraj 1+',false,'dunes'],
+ ['gap','Propast','Kraj 2+',false,'canyon'],['block','Padající blok','Kraj 2+',false,'canyon'],['vulture','Sup','Kraj 2+',true,'canyon'],
+ ['quick','Tekutý písek','Kraj 3+',false,'oasis'],['snake','Chřestýš','Kraj 3+',true,'oasis'],['wind','Písečná bouře','Kraj 4+',false,'night'],['boulder','Kutálející se balvan','Kraj 5',false,'temple']];
+function drawHazard(c,kind,biome){c.width=96;c.height=72;const x=c.getContext('2d');x.imageSmoothingEnabled=false;const Ly=layers(biome),TS=tileSet(biome);const G=56;
+  x.drawImage(Ly.sky,-330,-150);x.save();x.translate(0,G-GROUND);x.drawImage(Ly.far,-120,0);x.drawImage(Ly.near,-200,0);x.restore();
+  for(let i=0;i<6;i++){if((kind==='gap'||kind==='quick')&&(i===2||i===3))continue;x.drawImage(TS.top[i%3],i*16,G)}
+  const at=(s,cx,by)=>x.drawImage(s,Math.round(cx-s.width/2),Math.round(by-s.height+1));
+  if(kind==='gap'){x.fillStyle='#1a0f08';x.fillRect(32,G,32,16)}
+  if(kind==='quick'){for(let y=G-1;y<72;y++)for(let i=32;i<64;i++){const v=Math.sin((i-48)*0.35+(y-G)*0.5)+Math.sin(Math.hypot(i-48,y-66)*0.8);x.fillStyle=v>0.6?'#cdb06a':v>-0.4?'#b8954e':'#9c7b3a';x.fillRect(i,y,1,1)}
+    x.save();x.beginPath();x.rect(0,0,96,G+1);x.clip();at(SPR.walk[0],46,G+18);x.restore()}
+  if(kind==='scorp')at(SPR.scorp[0],48,G);if(kind==='plant')at(SPR.plantO,48,G);if(kind==='snake')at(SPR.snake,48,G);if(kind==='vulture')at(SPR.vulture[0],50,32);
+  if(kind==='cactus')at(saguaro(40),48,G);
+  if(kind==='block'){x.drawImage(TS.st[2],40,14);x.fillStyle='rgba(255,255,255,.7)';[[37,4],[58,6],[46,2]].forEach(([a,b])=>x.fillRect(a,b,1,7));x.fillStyle=BIOMES[biome].stone;x.fillRect(42,34,2,2);x.fillRect(52,38,2,2)}
+  if(kind==='boulder'){const R=rng(9);for(let j=-15;j<=15;j++)for(let i=-15;i<=15;i++){const d=Math.hypot(i,j);if(d>15.3)continue;let f=0.85+R()*0.18;if(j<-5&&i<0)f*=1.18;if(j>5||i>7)f*=0.78;if(d>14.3)f*=0.42;if((i*3+j*5)%17===0&&d<12)f*=0.8;x.fillStyle=shade('#8f8a80',f);x.fillRect(46+i,G-15+j,1,1)}
+    x.fillStyle='rgba(255,255,255,.6)';x.fillRect(8,G-8,12,1);x.fillRect(14,G-16,8,1);x.fillStyle='rgba(120,90,50,.6)';x.fillRect(24,G-2,6,2)}
+  if(kind==='wind'){const R=rng(4);for(let i=0;i<14;i++){x.fillStyle='rgba(240,220,170,.75)';x.fillRect(Math.floor(R()*80),4+Math.floor(R()*44),10+Math.floor(R()*14),1)}x.fillStyle='#e0c27a';for(let i=0;i<40;i++)x.fillRect(Math.floor(R()*96),Math.floor(R()*G),1,1);at(SPR.walk[2],44,G)}}
+
+/* ================= level profiles ================= */
+function genLevel(d,seed){const R=rng(seed),N=120;let h=3;const out=[];const push=o=>out.push(Object.assign({h,gap:false,plat:0,haz:'',coin:0},o));
+  while(out.length<N){const n=out.length;if(n<8||n>N-10||(n>56&&n<64)){push({});continue}const r=R();
+    if(d>=3&&r<0.05+0.01*d){h=Math.max(2,Math.min(6,h+(R()<.5?-1:1)));push({});continue}
+    if(d>=2&&r<0.10+0.02*d){const w=1+Math.floor(R()*Math.min(4,1+d/3));const s=out.length;for(let k=0;k<w;k++)push({gap:true});if(w>=3){out[s+1].plat=h+2;out[s+1].coin=h+3}push({});push({});continue}
+    if(d>=6&&r<0.16+0.02*d){for(let k=0;k<3;k++)push({plat:h+3,coin:h+4});continue}
+    if(r<0.22+0.03*d){push({haz:R()<.55?'s':'p'});push({});continue}
+    if(r<0.32+0.02*d){for(let k=0;k<3;k++)push({coin:h+1});continue}
+    push({})}
+  out.length=N;return out}
+function drawProfile(c,lvl){const S=5,N=lvl.length,ROWS=10;c.width=N*S;c.height=ROWS*S;const x=c.getContext('2d');
+  x.fillStyle='#bfe6ff';x.fillRect(0,0,c.width,c.height);
+  lvl.forEach((q,i)=>{const X=i*S;if(!q.gap){for(let r=0;r<q.h;r++){x.fillStyle=r===q.h-1?'#e8c872':'#c9a253';x.fillRect(X,(ROWS-1-r)*S,S,S)}}
+    if(q.plat){x.fillStyle='#b9894a';x.fillRect(X,(ROWS-1-q.plat)*S,S,S)}
+    if(q.haz){x.fillStyle=q.haz==='s'?'#d33':'#3a3';x.fillRect(X,(ROWS-1-q.h)*S,S,S)}
+    if(q.coin){x.fillStyle='#ffd21a';x.fillRect(X+1,(ROWS-1-q.coin)*S+1,S-2,S-2)}});
+  [[1,'#2f6fe0'],[60,'#f2c230'],[N-3,'#c62828']].forEach(([i,col])=>{const h=lvl[i].h;x.fillStyle='#555';x.fillRect(i*S+2,(ROWS-1-h-2)*S,1,S*3);x.fillStyle=col;x.fillRect(i*S+3,(ROWS-1-h-2)*S,4,3)})}
+
+/* ================= old v0.2 hero for comparison ================= */
+const HP={R:'#c62828',r:'#8e1b1b',H:'#5a3a1e',S:'#f1c19a',s:'#d9a07a',W:'#ffffff',K:'#1d2a6b',m:'#9c4a3a',B:'#2f6fe0',b:'#1f4fb0',P:'#3b3b4f',O:'#6b4a2a'};
+const HERO_FRONT=["...RRRRRR...","..RRRRRRRR..",".rrrrrrrrrr.","..HSSSSSSH..","..SSSSSSSS..","..SWKSSKWS..","..SSSSSSSS..","..SSSmmSSS..","...ssssss...","bBBBBBBBBBBb","bBBBBBBBBBBb","bBBBBBBBBBBb","S.BBBBBBBB.S","S.bbbbbbbb.S","..PPPPPPPP..","..PPP..PPP..","..PPP..PPP..","..SSS..SSS..","..OOO..OOO.."];
+function oldHero(){const c=cv(12,19),x=c.getContext('2d');HERO_FRONT.forEach((r,y)=>[...r].forEach((ch,i)=>{if(HP[ch]){x.fillStyle=HP[ch];x.fillRect(i,y,1,1)}}));
+  const o=cv(26,40),ox=o.getContext('2d');ox.imageSmoothingEnabled=false;ox.drawImage(c,1,1,24,38);return outline(o)}
+function toCanvas(target,spr,scale){target.width=spr.width*scale;target.height=spr.height*scale;const x=target.getContext('2d');x.imageSmoothingEnabled=false;x.drawImage(spr,0,0,target.width,target.height)}
+
+/* ================= icons ================= */
+const ICON={
+ jet:()=>art(16,18,P=>{P.r(3,2,4,10,'#c9c9c9');P.r(9,2,4,10,'#c9c9c9');P.r(3,2,1,10,'#7d7d7d');P.r(9,2,1,10,'#7d7d7d');P.r(5,3,1,8,'#eeeeee');P.r(11,3,1,8,'#eeeeee');P.r(7,4,2,6,'#7a4b24');P.r(3,1,4,1,'#d12d2d');P.r(9,1,4,1,'#d12d2d');P.r(4,12,2,2,'#555');P.r(10,12,2,2,'#555');P.r(4,14,2,2,'#ff8a00');P.r(10,14,2,2,'#ff8a00');P.p(4,16,'#ffe14d');P.p(11,16,'#ffe14d')}),
+ armor:()=>art(16,16,P=>{const I='#d8d8d8',S='#8a8a8a';P.r(1,2,4,4,I);P.r(11,2,4,4,I);P.r(3,4,10,10,I);P.r(6,4,4,2,S);P.r(3,13,10,1,S);P.r(5,6,1,6,'#f6f6f6');P.r(12,5,1,8,S);P.r(7,8,2,2,'#f2c230')}),
+ magnet:()=>art(16,16,P=>{P.r(2,2,4,9,'#d12d2d');P.r(10,2,4,9,'#d12d2d');P.r(2,1,4,2,'#e6e6e6');P.r(10,1,4,2,'#e6e6e6');P.el(8,11,6,3.5,'#d12d2d');P.el(8,10,2,2,'#00000000');P.x.clearRect(6,5,4,7);P.r(3,4,1,6,'#ff7060');P.r(11,4,1,6,'#ff7060')}),
+ map:()=>art(16,16,P=>{P.r(1,2,14,12,'#ecd7a6');P.r(1,2,14,1,'#a77a3f');P.r(1,13,14,1,'#a77a3f');for(let i=3;i<10;i+=2)P.p(i,5+(i%3),'#8b5a2b');P.ln(10,8,12,10,'#d22');P.ln(12,8,10,10,'#d22');P.r(3,10,3,2,'#6fb3f0')}),
+ spring:(lv)=>art(18,18,P=>{const b='#8a5a2b';P.r(3,2,3,6,b);P.r(3,6,9,4,b);P.r(3,9,10,1,'#4e3216');P.r(4,3,1,5,'#b07a44');for(let y=11;y<15;y++)P.r(4+(y%2)*2,y,6,1,'#bdbdbd');P.r(3,15,10,2,'#555');for(let i=0;i<lv;i++)P.r(14,3+i*3,2,2,'#ffd21a')})
+};
+
+/* ================= build ================= */
+function build(){initSprites();
+  toCanvas(document.getElementById('cHeroOld'),oldHero(),4);
+  toCanvas(document.getElementById('cHeroFront'),matejFront(MP),4);
+  const walk=cv(24*5+8,36),wx=walk.getContext('2d');[0,1,2,3].forEach(i=>wx.drawImage(SPR.walk[i],i*24,0));wx.drawImage(SPR.jump,4*24+8,-4);toCanvas(document.getElementById('cHeroWalk'),walk,2);
+  toCanvas(document.getElementById('cMummy'),SPR.mummy,4);toCanvas(document.getElementById('cCamel'),SPR.camel,4);
+  toCanvas(document.getElementById('cScorp'),SPR.scorp[0],3);toCanvas(document.getElementById('cPlant'),SPR.plantO,3);toCanvas(document.getElementById('cPlant2'),SPR.plantC,3);
+  ['hudCoin','hudCoin2','wCoin'].forEach(id=>toCanvas(document.getElementById(id),SPR.coin[0],1));
+  ['hudHearts','hudHearts2'].forEach(id=>{const el=document.getElementById(id);for(let i=0;i<3;i++){const c=cv(1,1);toCanvas(c,SPR.heart,1);el.appendChild(c)}});
+  // layers explainer
+  const lEl=document.getElementById('layers');const Ly=layers('dunes');
+  [['Obloha a slunce','nehýbe se, plynulý přechod barev',c=>c.drawImage(Ly.sky,0,0)],['Stolové hory','posun 8 %, opar v dálce',c=>{c.drawImage(Ly.sky,0,0);tiled(c,Ly.mesa,0)}],
+   ['Pyramidy','posun 16 %, osvětlená a stinná strana',c=>{c.drawImage(Ly.sky,0,0);tiled(c,Ly.pyr,0)}],['Vzdálené duny','posun 30 %, kaktusy, vlnky písku',c=>{c.drawImage(Ly.sky,0,0);tiled(c,Ly.far,0)}],
+   ['Blízké duny','posun 55 %, kameny, lebka, keře',c=>{c.drawImage(Ly.sky,0,0);tiled(c,Ly.near,0)}],['Všechno dohromady','plus herní kostky a postavy',c=>renderScene(c,300,'dunes',0.5,{collect:false})]].forEach(([n,d,fn])=>{
+    const w=document.createElement('div');w.className='layer';const c=cv(GW,GH);c.className='pix';const x=c.getContext('2d');x.imageSmoothingEnabled=false;
+    if(n!=='Všechno dohromady'){x.fillStyle='#00000000'}fn(x);const b=document.createElement('b');b.textContent=n;const s=document.createElement('span');s.textContent=d;w.append(c,b,s);lEl.appendChild(w)});
+  // dialog
+  const dc=document.getElementById('dialogCv').getContext('2d');const TL=layers('temple'),TS=tileSet('temple');dc.imageSmoothingEnabled=false;dc.drawImage(TL.sky,0,0);tiled(dc,TL.mesa,200);tiled(dc,TL.pyr,120);tiled(dc,TL.far,300);tiled(dc,TL.near,420);
+  for(let sx=0;sx<GW;sx+=T){dc.drawImage(TS.top[(sx/16)%3],sx,GROUND);for(let r=1;r<5;r++)dc.drawImage(TS.st[(sx/16+r)%4],sx,GROUND+r*T)}
+  const gx=330;const pil=pillar(96);dc.drawImage(pil,gx,GROUND-96+1);dc.drawImage(pil,gx+70,GROUND-96+1);dc.fillStyle='#e8d3a0';dc.fillRect(gx-6,GROUND-104,96,10);dc.fillStyle='#fff1c8';dc.fillRect(gx-6,GROUND-104,96,2);dc.fillStyle='#b99c62';dc.fillRect(gx-6,GROUND-95,96,1);
+  dc.fillStyle='#f2c230';dc.beginPath();dc.fillRect(gx+38,GROUND-101,8,5);
+  for(let j=GROUND-93;j<GROUND+1;j++)for(let i=gx+14;i<gx+70;i++){if(dith(i,j,0.35+0.3*Math.sin((i+j)/9)))dc.fillStyle='rgba(255,230,140,.55)',dc.fillRect(i,j,1,1)}
+  dc.drawImage(SPR.walk[0],150,GROUND-SPR.walk[0].height+1);dc.save();dc.translate(286+SPR.mummy.width,0);dc.scale(-1,1);dc.drawImage(SPR.mummy,0,GROUND-SPR.mummy.height+1);dc.restore();
+  // worlds
+  const wEl=document.getElementById('worlds');let i=0;for(const k in BIOMES){i++;const B=BIOMES[k];const d=document.createElement('div');d.className='world';const c=cv(GW,GH);c.className='pix';
+    renderScene(c.getContext('2d'),300+i*180,k,1.2,{collect:false});const b=document.createElement('b');b.textContent=i+'. '+B.name;const s=document.createElement('span');s.textContent=B.desc;d.append(c,b,s);wEl.appendChild(d)}
+  // hazards
+  const hEl=document.getElementById('hazards');HZ.forEach(([k,nm,kraj,stomp,bio])=>{const d=document.createElement('div');d.className='hzc';const c=cv(1,1);c.className='pix';drawHazard(c,k,bio);
+    const b=document.createElement('b');b.textContent=nm;const s=document.createElement('span');s.innerHTML=kraj+' · '+(stomp?'<span class="yes">skokem na hlavu ano</span>':'jen přeskočit nebo obejít');d.append(c,b,s);hEl.appendChild(d)});
+  // profiles
+  const pEl=document.getElementById('profiles');[[1,3,'Level 1 · kraj 1'],[8,9,'Level 8 · kraj 2'],[23,21,'Level 23 · kraj 5']].forEach(([lv,seed,lab])=>{const d=Math.max(1,Math.round(lv/2.4));const lvl=genLevel(d,seed);const st={haz:lvl.filter(c=>c.haz).length,gap:0,coin:lvl.filter(c=>c.coin).length};
+    let prev=false;lvl.forEach(c=>{if(c.gap&&!prev)st.gap++;prev=c.gap});const w=document.createElement('div');w.className='profile';w.innerHTML='<div class="meta"><b>'+lab+'</b><span class="muted">120 bloků · '+st.haz+' nepřátel · '+st.gap+' propastí · '+st.coin+' mincí</span></div><div class="cv"><canvas class="pix"></canvas></div>';
+    drawProfile(w.querySelector('canvas'),lvl);pEl.appendChild(w)});
+  // shop
+  const mkItem=(spr,nm,ef,pr,sel)=>{const it=document.createElement('div');it.className='item slot'+(sel?' sel':'');const c=cv(1,1);toCanvas(c,spr,1);
+    const n=document.createElement('div');n.className='nm';n.textContent=nm;const e=document.createElement('div');e.className='ef';e.textContent=ef;const p=document.createElement('div');p.className='pr';const pc=cv(1,1);toCanvas(pc,SPR.coin[0],1);p.append(pc,document.createTextNode(pr));it.append(c,n,e,p);return it};
+  const s1=document.getElementById('shelf1');[['jet','Raketový batoh','3 s letu',40],['armor','Brnění','vydrží 1 zásah',30],['magnet','Magnet','přitahuje mince',25],['map','Mapa tajemství','ukáže tajné místnosti',35]].forEach(([k,n,e,p],j)=>s1.appendChild(mkItem(ICON[k](),n,e,p,j===0)));
+  const s2=document.getElementById('shelf2');[['Pružinové boty I','skok +1 blok',100,1],['Pružinové boty II','skok +1,5 bloku',200,2],['Pružinové boty III','skok +2 bloky',350,3]].forEach(([n,e,p,lv])=>s2.appendChild(mkItem(ICON.spring(lv),n,e,p)));
+  const s3=document.getElementById('shelf3');[['Zelená čepice',{cap:'#3a9a3a',capHi:'#6fd06a',capSh:'#246624',brim:'#2c7a2c',brimSh:'#1a4a1a'},60],['Žlutá čepice',{cap:'#f2c230',capHi:'#ffe680',capSh:'#b88f12',brim:'#d4a420',brimSh:'#8a6a0c'},60],['Černá čepice',{cap:'#3a3a3a',capHi:'#6a6a6a',capSh:'#1c1c1c',brim:'#2a2a2a',brimSh:'#101010'},80],['Oranžové tričko',{shirt:'#f08a2a',shirtHi:'#ffb36a',shirtSh:'#c0651a',logo:'#ffffff'},90],['Bílé tričko',{shirt:'#f0f0f0',shirtHi:'#ffffff',shirtSh:'#c8c8c8',logo:'#d8382a'},90]].forEach(([n,ov,p])=>s3.appendChild(mkItem(matejFront(Object.assign({},MP,ov)),n,'jen vzhled',p)));
+}
+
+/* ================= animation ================= */
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let curBiome='dunes';
+function setupTabs(){const el=document.getElementById('tabs');let i=0;for(const k in BIOMES){i++;const b=document.createElement('button');b.className='btab';b.type='button';b.textContent=i+'. '+BIOMES[k].name;b.dataset.k=k;b.setAttribute('aria-pressed',k===curBiome?'true':'false');el.appendChild(b)}
+  el.addEventListener('click',e=>{const b=e.target.closest('.btab');if(!b)return;curBiome=b.dataset.k;el.querySelectorAll('.btab').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));const n=Object.keys(BIOMES).indexOf(curBiome)+1;document.getElementById('hudLevel').textContent='Kraj '+n+' · Level '+(n*5-2)})}
+function animate(){const hc=document.getElementById('hero').getContext('2d'),pc=document.getElementById('phoneCv').getContext('2d');const cnt=document.getElementById('hudCount');
+  const base=COINS.filter(c=>!c.deco);const start=performance.now();
+  function frame(now){const t=(now-start)/1000;const cam=reduce?240:t*78;
+    renderScene(hc,cam,curBiome,t);renderScene(pc,cam+500,'canyon',t);
+    const heroAbs=cam+HX,loops=Math.floor(heroAbs/L);cnt.textContent=loops*base.length+base.filter(c=>c.x<heroAbs-loops*L+8).length;
+    if(!reduce)requestAnimationFrame(frame)}
+  requestAnimationFrame(frame)}
+
+/* ================= questionnaire 3 ================= */
+const QS=[
+ {sec:'G',title:'Grafika verze 0.3',qs:[
+  {id:'postavy',type:'radio',label:'Sedí nové postavy?',opts:[['ano','Ano, takhle','',1],['vic','Ještě víc detailů','Větší postavy, víc barev.'],['jinak','Jiný směr','Popište v poznámce.']]},
+  {id:'pozadi',type:'radio',label:'Sedí nové pozadí?',opts:[['ano','Ano, takhle','',1],['vic','Ještě víc detailů','Třeba ptáci, karavany v dálce, létající listí.'],['jinak','Jiný směr','Popište v poznámce.']]},
+  {id:'oblibeny',type:'radio',label:'Který kraj vypadá nejlépe?',help:'Pomůže mi to ladit ostatní kraje stejným směrem.',opts:[['dunes','Zlaté duny',''],['canyon','Rudý kaňon',''],['oasis','Oáza Palmíra',''],['night','Noční poušť',''],['temple','Chrám Slunce','']]}
+ ]},
+ {sec:'H',title:'Ostatní',qs:[
+  {id:'zarizeni',type:'text',label:'Starší zařízení, na kterém se bude hrát (nepovinné)',ph:'např. iPad 9. generace'},
+  {id:'poznamky',type:'textarea',label:'Cokoli dalšího?',ph:'Například: Bedřich by mohl mít brýle.'}
+ ]}
+];
+const form=document.getElementById('form');
+function renderForm(){QS.forEach(s=>{const fs=document.createElement('fieldset');const lg=document.createElement('legend');lg.innerHTML='<span class="fs-title"><span class="letter">'+s.sec+'</span><h3>'+s.title+'</h3></span>';fs.appendChild(lg);
+  s.qs.forEach(q=>{const d=document.createElement('div');d.className='q';const lab=document.createElement('div');lab.className='ql';lab.id='l-'+q.id;lab.textContent=q.label;d.appendChild(lab);
+    if(q.help){const h=document.createElement('div');h.className='qh';h.textContent=q.help;d.appendChild(h)}
+    if(q.type==='text'||q.type==='textarea'){const inp=document.createElement(q.type==='text'?'input':'textarea');if(q.type==='text')inp.type='text';inp.id='q-'+q.id;inp.name=q.id;inp.placeholder=q.ph||'';inp.setAttribute('aria-labelledby','l-'+q.id);d.appendChild(inp)}
+    else{const g=document.createElement('div');g.className='opts';g.setAttribute('role','radiogroup');g.setAttribute('aria-labelledby','l-'+q.id);
+      q.opts.forEach(([v,t,desc,rec])=>{const l=document.createElement('label');l.className='opt';const i=document.createElement('input');i.type='radio';i.name=q.id;i.value=v;i.id='q-'+q.id+'-'+v;
+        const ot=document.createElement('span');ot.className='ot';const b=document.createElement('b');b.textContent=t;if(rec){const r=document.createElement('span');r.className='rec';r.textContent='DOPORUČUJI';b.appendChild(r)}ot.appendChild(b);
+        if(desc){const sp=document.createElement('span');sp.textContent=desc;ot.appendChild(sp)}const ty=document.createElement('span');ty.className='tally';ty.hidden=true;ty.dataset.k=q.id+'|'+v;l.append(i,ot,ty);g.appendChild(l)});d.appendChild(g)}
+    fs.appendChild(d)});form.appendChild(fs)})}
+function collect(){const a={};QS.forEach(s=>s.qs.forEach(q=>{if(q.type==='radio'){const c=form.querySelector('input[name="'+q.id+'"]:checked');if(c)a[q.id]=c.value}else{const v=form.querySelector('[name="'+q.id+'"]').value.trim();if(v)a[q.id]=v}}));return a}
+function fill(a){if(!a)return;QS.forEach(s=>s.qs.forEach(q=>{const v=a[q.id];if(v==null)return;if(q.type==='radio'){const i=form.querySelector('input[name="'+q.id+'"][value="'+v+'"]');if(i)i.checked=true}else form.querySelector('[name="'+q.id+'"]').value=v}))}
+function asText(a){const lines=[];QS.forEach(s=>{lines.push('== '+s.sec+'. '+s.title+' ==');s.qs.forEach(q=>{let v=a[q.id];if(v==null){lines.push(q.label+' — (bez odpovědi)');return}if(q.opts){const m=Object.fromEntries(q.opts.map(o=>[o[0],o[1]]));v=m[v]||v}lines.push(q.label+' — '+v)})});return lines.join('\n')}
+const DK='matej-poust-draft-3';
+function saveDraft(){try{localStorage.setItem(DK,JSON.stringify(collect()))}catch(e){}}
+function loadDraft(){try{return JSON.parse(localStorage.getItem(DK)||'null')}catch(e){return null}}
+const statusEl=document.getElementById('status'),respEl=document.getElementById('respondents');
+let db=null,user=null,uid=null,dirty=false;const COL='art';
+function setStatus(t){statusEl.textContent=t}
+async function initDb(){try{[db,user]=await Promise.all([claude.use('db'),claude.use('user')])}catch(e){}
+  if(!db){respEl.innerHTML='<span class="muted">Sdílené ukládání tu není k dispozici. Použijte tlačítko Kopírovat jako text.</span>';return}
+  uid=user?await user.id():null;
+  if(uid){try{const s=await db.doc(COL+'/'+uid).get();if(s.exists&&!dirty){fill(s.data().answers);setStatus('Načteny vaše uložené odpovědi.')}}catch(e){}}else setStatus('Pro uložení se přihlaste. Kopírování jako text funguje vždy.');
+  const timer=setTimeout(()=>{respEl.innerHTML='<span class="muted">Odpovědi ostatních se zatím nepodařilo načíst.</span>'},10000);
+  db.collection(COL).onSnapshot(async snap=>{if(!snap.metadata.fromCache)clearTimeout(timer);await renderShared(snap.docs)},()=>{clearTimeout(timer);respEl.innerHTML='<span class="muted">Odpovědi ostatních nejsou k dispozici.</span>'})}
+async function renderShared(docs){const ids=docs.map(d=>d.id);const ps=user&&ids.length?await user.profiles(ids):{};
+  respEl.replaceChildren();const lab=document.createElement('span');lab.className='muted';lab.textContent=ids.length?'Odpovědělo '+ids.length+':':'Na tento dotazník zatím nikdo neodpověděl.';respEl.appendChild(lab);
+  docs.forEach(d=>{const p=ps[d.id]||{};const w=document.createElement('span');w.className='who';if(p.avatarUrl){const im=document.createElement('img');im.src=p.avatarUrl;im.alt='';w.appendChild(im)}const n=document.createElement('span');n.textContent=(p.isMe?'Vy':(p.name||'Někdo'));w.appendChild(n);respEl.appendChild(w)});
+  const tally={};docs.forEach(d=>{const a=(d.data()||{}).answers||{};for(const k in a){const key=k+'|'+a[k];tally[key]=(tally[key]||0)+1}});
+  document.querySelectorAll('.tally').forEach(t=>{const n=tally[t.dataset.k]||0;t.hidden=!n;t.textContent=n+'×'})}
+async function save(){const a=collect();saveDraft();if(!db||!uid){showCopy(a);setStatus('Ukládání není k dispozici. Zkopírujte text níže.');return}
+  setStatus('Ukládám…');try{await db.doc(COL+'/'+uid).set({answers:a,updatedAt:Date.now()});dirty=false;setStatus('Uloženo v '+new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})+'.')}
+  catch(e){showCopy(a);setStatus(e&&e.code==='invalid_argument'?'Nemáte oprávnění ukládat. Zkopírujte text níže a pošlete ho.':'Uložení se nepovedlo. Zkuste to znovu, nebo zkopírujte text níže.')}}
+function showCopy(a){const p=document.getElementById('copyPanel');p.hidden=false;const box=document.getElementById('copybox');box.value=asText(a);return box}
+document.getElementById('saveBtn').addEventListener('click',save);
+document.getElementById('copyBtn').addEventListener('click',()=>{const box=showCopy(collect());try{navigator.clipboard.writeText(box.value).then(()=>setStatus('Text zkopírován do schránky.'),()=>{box.focus();box.select();setStatus('Text je označený, zkopírujte ho Ctrl+C.')})}catch(e){box.focus();box.select()}});
+form.addEventListener('change',()=>{dirty=true;saveDraft();setStatus('Máte neuložené změny.')});
+form.addEventListener('input',()=>{dirty=true;saveDraft()});
+
+build();setupTabs();renderForm();
+const draft=loadDraft();if(draft)fill(draft);
+animate();
+if(window.claude&&claude.use)initDb();else respEl.innerHTML='<span class="muted">Sdílené ukládání tu není k dispozici. Použijte Kopírovat jako text.</span>';
+</script>
